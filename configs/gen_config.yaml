@@ -1,0 +1,15 @@
+params:
+    name: '2eORR-1K-lattice-default-gen'
+    tokenizer_path: './data/tokenizer/'
+    model_path: './models/2eORR-fine-tuned-GPT2/'
+    input_path: './data/inputs/oc20_val_lattice_preset_1K.pkl'
+    max_len: 1024
+    top_k: 50
+    top_p: 0.9
+    temperature: 1.0
+    no_repeat_ngram_size: 4
+    
+    
+
+  
+  

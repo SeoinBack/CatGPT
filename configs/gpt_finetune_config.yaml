@@ -1,0 +1,18 @@
+model_params:
+    name: '2eORR-fine-tuned-gen-model'
+    pretrained_path: './models/oc20-2M-GPT2/'
+    lora_rank: 16
+    lora_alpha: 32
+    lora_dropout: 0.05
+    n_epochs: 100
+    
+data_params:
+    tokenizer_path: './data/tokenizer/'
+    train_data_path: './data/2eORR_dataset/train.txt'
+    val_data_path: './data/2eORR_dataset/val.txt'
+    max_len: 1024
+    batch_size: 8
+    gradient_accumulation_steps: 4
+    
+  
+  
