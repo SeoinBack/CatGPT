@@ -73,7 +73,7 @@ Users an customize the path to anomaly detection model, validation parameters an
 ## Example Use
 
 ### Adsorbate Conditional Generation
->⚠️ **Note**: Currently, the dataframe used for training the adsorbate conditional generative model *must* include a column for adsorbate symbols. The column will be automatically added to the dataframe only for the OC20 dataset.
+>⚠️ **Note**: Currently, the dataframe used for training the adsorbate conditional generative model *must* include a column for adsorbate symbols. The column will not be automatically added to the dataframe except only for the OC20 dataset.
 
 This feature generates catalyst structures conditioned on specified adsorbates.
 
