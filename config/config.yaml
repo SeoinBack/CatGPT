@@ -1,0 +1,30 @@
+model_params:
+    name: 'oc20-2M-GPT2-test'
+    architecture : 'GPT'
+    use_pretrained : False
+    use_lora : False
+    use_numerical_encoding : False
+    
+    n_positions: 1024
+    n_embd: 512
+    n_layer: 12
+    n_head: 8
+    n_epochs: 1
+  
+    # pretrained 
+    checkpoint_path: './model/GPT2-2M/'
+    
+    # lora
+    r: 16,
+    lora_alpha: 32,
+    lora_dropout: 0.05,
+    task_type: 'CAUSAL_LM'
+    
+data_params:
+    string_type: 'coordinate'
+    augment_type: 'normal'
+    train_data_path: './data/dataset/oc20-2M/train.txt'
+    val_data_path: './data/dataset/oc20-2M/val.txt'
+    max_len: 1024
+    batch_size: 8
+    gradient_accumulation_steps: 16
