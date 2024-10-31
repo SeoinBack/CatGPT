@@ -18,14 +18,14 @@ This model is described in the paper: [Generative Pretrained Transformer for Het
 Run the following commands to set up:
 
 ```bash
-conda update conda # Updates Conda to the latest version
+conda update conda
 conda env create -f env.yml # Creates the environment with all dependencies
 ```
 Activate the Conda environment with `conda activate catgpt`.
 
 ## Datasets
 
-### Pretrainig Dataset
+### Pretraining Dataset
 The training and validation dataset is sourced from the [Open Catalyst 2020 (OC20) database](https://fair-chem.github.io/core/datasets/oc20.html) in the [Fair-chem repository](https://github.com/FAIR-Chem/fairchem).
 
 To convert the dataset to a dataframe with string representations for CatGPT training, run:
