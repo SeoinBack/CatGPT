@@ -23,8 +23,8 @@ model_params:
 data_params:
     string_type: 'coordinate'
     augment_type: 'normal'
-    train_data_path: './data/dataset/oc20-2M/train.txt'
-    val_data_path: './data/dataset/oc20-2M/val.txt'
+    train_data_path: './data/dataset/oc20-2M/train.csv'
+    val_data_path: './data/dataset/oc20-2M/val.csv'
     max_len: 1024
     batch_size: 8
     gradient_accumulation_steps: 16
