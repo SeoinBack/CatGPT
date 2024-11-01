@@ -1,3 +1,5 @@
+> 🚧 **Note:** This repository is currently a work in progress. Some features may be incomplete or may produce errors as development is ongoing.
+
 # Catalyst Generative Pretrained Transformer
 Catalyst Generative Pretrained Transformer (CatGPT) is a heterogeneous catalyst generative model based on Generative Pretrained Transformer 2 (GPT-2) architecture,
 designed to generate string representations of catalyst structures, including both slab and adsorbate atoms.
