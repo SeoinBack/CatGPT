@@ -22,7 +22,7 @@ data_params = params.data_params
 
 
 tokenizer = PreTrainedTokenizerFast.from_pretrained(
-    f'./tokenizer/{data_params.string_type}-tokenizer/',
+    f'./data/tokenizer/{data_params.string_type}-tokenizer/',
     max_len=data_params.max_len
 )
 
@@ -97,7 +97,7 @@ training_args = TrainingArguments(
     save_total_limit =5,
 )
 
-if use_numerical_encoding:
+if model_params.use_numerical_encoding:
     trainer = CustomHFTrainer(
         model = model,
         args = training_args,
