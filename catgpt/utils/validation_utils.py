@@ -4,7 +4,6 @@ import numpy as np
 import torch
 import smact
 from smact.screening import pauling_test
-n
 from generation_utils import *
 from pymatgen.io.ase import AseAtomsAdaptor
 

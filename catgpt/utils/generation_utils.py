@@ -137,13 +137,31 @@ def str_to_atoms(atoms_str,lat_idx = 1, early_stop = True, skip_fail = False, re
         return atoms, struct_checksum, valid_gen_checksum
     
     
-def atoms_to_str(atoms,round_range = 3):
+def atoms_to_str(atoms, tagged = True, round_range = 3):
     lattice = [f'{np.round(i,round_range):.3f}' for i in atoms.cell.cellpar()/180]
     surf = []
+    bulk = []
     ads = []
-    for atom,pos in zip(atoms,atoms.get_scaled_positions(wrap=True)):
-        surf.append(atom.symbol)
-        surf.extend([f'{np.round(i,round_range):.3f}' for i in pos])
-    return ' '.join(lattice + surf)
+    
+    if tagged:
+        for atom,pos in zip(atoms,atoms.get_scaled_positions(wrap=True)):
+            tag = atom.tag
+    
+            if tag == 0:
+                bulk.append(atom.symbol)
+                bulk.extend([f'{np.round(i,round_range):.3f}' for i in pos])
+            elif tag == 1:
+                surf.append(atom.symbol)
+                surf.extend([f'{np.round(i,round_range):.3f}' for i in pos])
+            elif tag == 2:
+                ads.append(atom.symbol)
+                ads.extend([f'{np.round(i,round_range):.3f}' for i in pos])
+        return ' '.join(lattice + bulk + surf + ads)
+        
+    else:
+        for atom,pos in zip(atoms,atoms.get_scaled_positions(wrap=True)):
+            surf.append(atom.symbol)
+            surf.extend([f'{np.round(i,round_range):.3f}' for i in pos])
+        return ' '.join(lattice + surf)
         
     
