@@ -1,5 +1,6 @@
-import sys
-sys.path.append('../')
+import sys, os
+abs_path = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
+sys.path.append(abs_path)
 
 import pickle
 import torch
@@ -15,7 +16,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from tqdm import tqdm
 from omegaconf import OmegaConf
 
-params = OmegaConf.load('../config/validation_config.yaml')
+params = OmegaConf.load(abs_path + '/config/validation_config.yaml')
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 with open(params.generated_path,'rb') as fr:

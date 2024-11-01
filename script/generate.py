@@ -1,7 +1,7 @@
-import sys
-sys.path.append('../')
+import sys, os
+abs_path = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
+sys.path.append(abs_path)
 
-import os
 import pickle
 import torch
 import numpy as np
@@ -16,11 +16,11 @@ from ase.atoms import Atoms
 
 from omegaconf import OmegaConf
 
-params = OmegaConf.load('../config/generation_config.yaml')
+params = OmegaConf.load(abs_path + '/config/generation_config.yaml')
 device = torch.device(params.device)
 
 tokenizer = PreTrainedTokenizerFast.from_pretrained(
-    f'../tokenizer/{params.string_type}-tokenizer/',
+    abs_path + f'/data/tokenizer/{params.string_type}-tokenizer/',
     max_len=1024
 )
 model = GPT2LMHeadModel.from_pretrained(params.checkpoint_path)
