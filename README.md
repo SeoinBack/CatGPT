@@ -83,4 +83,4 @@ Users can skip 1. and 2. by downloading the pretrained model checkpoint.
 2. Run `python train.py` to train the model.
 3. Set `input_prompt` to the desired adsorbate symbol, e.g., '*O', `string_type` as 'ads' and `checkpoint_path` to the trained model in `config/generation_config.yaml`.
 
-The avaliable adsorbate symbols are the same as the list of adsorbates included in the [OC20 dataset](https://fair-chem.github.io/core/datasets/oc20.html#per-adsorbate-trajectories).
+The avaliable adsorbate symbols are the same as the list of adsorbates included in the [OC20 database](https://fair-chem.github.io/core/datasets/oc20.html#per-adsorbate-trajectories).
