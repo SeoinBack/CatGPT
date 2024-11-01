@@ -77,10 +77,10 @@ Users an customize the path to anomaly detection model, validation parameters an
 
 This feature generates catalyst structures conditioned on specified adsorbates.
 
-Users can skip 1. and 2. by downloading the pretrained model checkpoint.
-
 1. Set `string_type` as 'ads' in `config/config.yaml` to automatically add adsorbate symbols to the represenation.
 2. Run `python train.py` to train the model.
 3. Set `input_prompt` to the desired adsorbate symbol, e.g., '*O', `string_type` as 'ads' and `checkpoint_path` to the trained model in `config/generation_config.yaml`.
+
+Users can skip 1. and 2. by downloading the pretrained model checkpoint.
 
 The avaliable adsorbate symbols are the same as the list of adsorbates included in the [OC20 database](https://fair-chem.github.io/core/datasets/oc20.html#per-adsorbate-trajectories).
