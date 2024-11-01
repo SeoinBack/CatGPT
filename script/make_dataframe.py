@@ -1,9 +1,12 @@
-import sys
-sys.path.append('../')
+import sys, os
+abs_path = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
+sys.path.append(abs_path)
 
 import argparse
 import pandas as pd
 import numpy as np
+import pickle
+from tqdm import tqdm
 
 from fairchem.core.preprocessing import AtomsToGraphs
 from fairchem.core.datasets import LmdbDataset, data_list_collater
@@ -40,7 +43,7 @@ def convert(args):
     if args.data_type == 'lmdb':
         ads_list = []
         
-        with open('../data/mapping/oc20_data_mapping_symbol_only.pkl','rb') as fr:
+        with open(abs_path + '/data/mapping/oc20_data_mapping_symbol_only.pkl','rb') as fr:
             mapping = pickle.load(fr)
                     
         dataset = LmdbDataset({'src':args.src_path})
