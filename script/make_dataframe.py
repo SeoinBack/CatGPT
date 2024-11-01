@@ -37,7 +37,7 @@ def convert(args):
 
     id_list = []
     atoms_list = []
-    energy_list = []
+    # energy_list = []
     
     # Convert lmdb to ase atoms
     if args.data_type == 'lmdb':
@@ -49,11 +49,13 @@ def convert(args):
         dataset = LmdbDataset({'src':args.src_path})
         check_key = True
         key_exists = True
-                
+        keys = dataset[0].keys()
+        
         for i in tqdm(range(len(dataset))):
             data = dataset[i]
             id_ = data.sid
-            energy = data.energy
+            # energy = data.energy
+                
             
             if check_key:
                 if 'random'+str(id_) not in mapping.keys():
@@ -72,7 +74,7 @@ def convert(args):
             
             id_list.append(id_)
             atoms_list.append(atoms)
-            energy_list.append(energy)
+            # energy_list.append(energy)
             ads_list.append(ads)
     
     elif args.data_type == 'ase':
@@ -82,8 +84,8 @@ def convert(args):
             atoms_list = read(arg.src_path, ':')
         id_list = list(range(len(atoms_list)))
         
-        if 'energy' in atoms_list[0].get_properties([]).keys():
-            energy_list = [atoms.get_potential_energy() for atoms in atoms_list]
+        # if 'energy' in atoms_list[0].get_properties([]).keys():
+        #     energy_list = [atoms.get_potential_energy() for atoms in atoms_list]
     
     # Convert atoms to string
     is_tagged =  2 in atoms_list[0].get_tags()
@@ -92,7 +94,7 @@ def convert(args):
     df = pd.DataFrame(columns = ['id','cat_txt','target'])
     df['id'] = id_list
     df['cat_txt'] = cat_txt_list
-    df['target'] = energy_list
+    # df['target'] = energy_list
     
     if 'ads_list' in globals():
         df['ads_symbol'] = ads_list
