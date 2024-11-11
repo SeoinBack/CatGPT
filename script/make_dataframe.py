@@ -37,7 +37,7 @@ def convert(args):
 
     id_list = []
     atoms_list = []
-    #energy_list = []
+    ads_list = None
     
     # Convert lmdb to ase atoms
     if args.data_type == 'lmdb':
@@ -53,8 +53,8 @@ def convert(args):
         for i in tqdm(range(len(dataset))):
             data = dataset[i]
             id_ = data.sid
-            #energy = data.energy
             
+            # Adsorbate check
             if check_key:
                 if 'random'+str(id_) not in mapping.keys():
                     print(f"Warning: Key 'random{id_}' not found in mapping.")
@@ -67,14 +67,21 @@ def convert(args):
                 ads = mapping['random' + str(id_)]
             
             batch = data_list_collater([data])
-
+            
+            # Energy check
+            if ~hasattr(batch,'energy'):
+                for att in ['y','y_init']:
+                    if hasattr(batch,att):
+                        batch.energy = getattr(batch, att)
+            
+            # Force check
             if ~hasattr(batch,'force') and hasattr(batch,'forces'):
                 batch.force = batch.forces
+                
             atoms = batch_to_atoms(batch)
             
             id_list.append(id_)
             atoms_list.extend(atoms)
-            #energy_list.append(energy)
             ads_list.append(ads)
     
     elif args.data_type == 'ase':
@@ -83,9 +90,6 @@ def convert(args):
         else:
             atoms_list = read(arg.src_path, ':')
         id_list = list(range(len(atoms_list)))
-        
-        #if 'energy' in atoms_list[0].get_properties([]).keys():
-            #energy_list = [atoms.get_potential_energy() for atoms in atoms_list]
     
     # Convert atoms to string
     is_tagged =  2 in atoms_list[0].get_tags()
@@ -94,9 +98,8 @@ def convert(args):
     df = pd.DataFrame(columns = ['id','cat_txt'])
     df['id'] = id_list
     df['cat_txt'] = cat_txt_list
-    #df['target'] = energy_list
     
-    if 'ads_list' in globals():
+    if ads_list is not None:
         df['ads_symbol'] = ads_list
         
     df.to_csv(os.path.join(args.dst_path, args.name + '.csv'))

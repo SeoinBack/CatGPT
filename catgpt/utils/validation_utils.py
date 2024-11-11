@@ -1,10 +1,9 @@
-
 import itertools
 import numpy as np
 import torch
 import smact
 from smact.screening import pauling_test
-from generation_utils import *
+from catgpt.utils.generation_utils import atoms_to_str
 from pymatgen.io.ase import AseAtomsAdaptor
 
 from scipy.spatial.distance import pdist
