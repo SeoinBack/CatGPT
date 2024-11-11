@@ -32,12 +32,13 @@ The training and validation dataset is sourced from the [Open Catalyst 2020 (OC2
 
 To convert the dataset to a dataframe with string representations for CatGPT training, run:
 ```
-python scripts/make_dataframe.py --name DATASET_NAME --src_path DATASET_PATH --dst_path SAVE_PATH --data_type lmdb
+python scripts/make_dataframe.py --name <DATASET_NAME> --src_path <DATASET_PATH> --dst_path <SAVE_PATH> --data_type lmdb
 ```
-- `name`: Name for the output dataframe
-- `src_path`: Path to the source dataset
-- `dst_path`: Path to save the converted dataframe
-- `data_type` : Choose either `lmdb` (OC20 dataset format) or `ase` (atoms format that can be opened by ASE)
+#### Arguments
+- `name`: Name for the output dataframe.
+- `src_path`: Path to the source dataset.
+- `dst_path`: Path to save the converted dataframe.
+- `data_type` : Choose either `lmdb` (OC20 dataset format) or `ase` (atoms format that can be opened by ASE).
 
 ### Fine-tuning Dataset
 The 2e-ORR dataset, used as an example for fine-tuning, can be found in `data/dataset/2eORR/`.
@@ -57,21 +58,36 @@ Users can customize the dataset, tokenizer, hyperparameters, and other settings 
 To generate string representations of catalyst structures, run:
 
 ```
-python script/generate.py
+python script/generate.py --name <NAME> --ckpt_path <MODEL_PATH> --save_path <SAVE_PATH>
 ```
+#### Required Arguments
+- `name`: Name for the generated structures set.
+- `ckpt_path`: Path to the trained generative model checkpoint.
+- `save_path`: Path to save the generated structures set.
 
-Users can customize the path to the trained model, generation parameters and other settings in `config/generation_config.yml`.
+#### Optional Arguments
+- `string_type` : Type of tokenization strategy to use.
+- `input_prompt` : Initial prompt for generation (e.g., a specific adsorbate).
+- `n_generation`, `top_k`, `top_p`, `temperature` : Generation parameters that control the diversity and creativity of generated structures.
 
 ## Evaluation
 
-To evaluate generated strings and save them in a structures format, run:
+To evaluate generated strings and save them in a crystal format, run:
 
 ```
-python script/validation.py
+python script/validate.py --cls_path <MODEL_PATH> --gen_path <GENERATED_DATA_PATH> --save_path <SAVE_PATH>
 ```
+#### Required Arguments
+- `cls_path`: Path to the trained detection model checkpoint.
+- `gen_path`: Path to the generated structures set.
+- `save_path`: Path to save validated data.
 
-Users an customize the path to anomaly detection model, validation parameters and other setting in `config/validation_config.yml`.
-
+#### Optional Arguments
+- `gt_path` : Path to ground-truth structure data for comparison.
+- `string_type` : Type of tokenization strategy to use.
+- `n_samples` : Number of structures to validate.
+- `skip_fail` : Option to bypass overlapping atoms in the generated structures.
+- 
 ## Example Use
 
 ### Adsorbate Conditional Generation
@@ -81,7 +97,7 @@ This feature generates catalyst structures conditioned on specified adsorbates.
 
 1. Set `string_type` as 'ads' in `config/config.yaml` to automatically add adsorbate symbols to the represenation.
 2. Run `python train.py` to train the model.
-3. Set `input_prompt` to the desired adsorbate symbol, e.g., '*O', `string_type` as 'ads' and `checkpoint_path` to the trained model in `config/generation_config.yml`.
+3. Run `python script/generate.py --ckpt_path <TRAINED_MODEL_PATH> --input_prompt *O --string_type ads`
 
 Users can skip 1. and 2. by downloading the pretrained model checkpoint.
 
