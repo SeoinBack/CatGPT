@@ -70,6 +70,9 @@ python script/generate.py --name <NAME> --ckpt_path <MODEL_PATH> --save_path <SA
 - `input_prompt` : Initial prompt for generation (e.g., a specific adsorbate).
 - `n_generation`, `top_k`, `top_p`, `temperature` : Generation parameters that control the diversity and creativity of generated structures.
 
+#### Pre-trained Model
+You can download a pre-trained model checkpoint from [here](https://zenodo.org/records/14406696)
+
 ## Evaluation
 
 To evaluate generated strings and save them in a crystal format, run:
