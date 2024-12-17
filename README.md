@@ -90,7 +90,10 @@ python script/validate.py --cls_path <MODEL_PATH> --gen_path <GENERATED_DATA_PAT
 - `string_type` : Type of tokenization strategy to use.
 - `n_samples` : Number of structures to validate.
 - `skip_fail` : Option to bypass overlapping atoms in the generated structures.
-  
+
+#### Pre-trained Model
+You can download a pre-trained detection model checkpoint from [here](https://zenodo.org/records/14504779)
+
 ## Example Use
 
 ### Adsorbate Conditional Generation
