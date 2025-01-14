@@ -32,7 +32,7 @@ The training and validation dataset is sourced from the [Open Catalyst 2020 (OC2
 
 To convert the dataset to a dataframe with string representations for CatGPT training, run:
 ```
-python scripts/make_dataframe.py --name <DATASET_NAME> --src_path <DATASET_PATH> --dst_path <SAVE_PATH> --data_type lmdb
+python script/make_dataframe.py --name <DATASET_NAME> --src_path <DATASET_PATH> --dst_path <SAVE_PATH> --data_type lmdb
 ```
 #### Arguments
 - `name`: Name for the output dataframe.
