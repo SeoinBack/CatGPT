@@ -40,7 +40,16 @@ python script/make_dataframe.py --name <DATASET_NAME> --src_path <DATASET_PATH> 
 - `dst_path`: Path to save the converted dataframe.
 - `data_type` : Choose either `lmdb` (OC20 dataset format) or `ase` (atoms format that can be opened by ASE).
 
-### Fine-tuning Dataset
+#### For training a detection model
+To train a detection model that evaluates catalyst validity, corrupted representations paired with binary labels (valid vs. corrupted) are needed. 
+
+Users can generate corrupted data and labels into the dataframe by including the `--corrupt_data` argument:
+
+```
+python script/make_dataframe.py --name <DATASET_NAME> --src_path <DATASET_PATH> --dst_path <SAVE_PATH> --data_type lmdb --corrupt_data
+```
+
+#### Fine-tuning Dataset
 The 2e-ORR dataset, used as an example for fine-tuning, can be found in `data/dataset/2eORR/`.
 
 ## Training
@@ -53,6 +62,19 @@ python train.py
 
 Users can customize the dataset, tokenizer, hyperparameters, and other settings in `config/config.yml`.
 
+#### Training detection model
+
+If users set the `architecture` parameter as `'BERT'` in `config.yml`, the script will automatically train a detection model using the corrupted data and binary labels generated earlier.
+
+For example:
+
+```yaml
+model_params:
+    name: 'oc20-2M-BERT'
+    architecture : 'BERT'
+    ...
+```
+
 ## Generation
 
 To generate string representations of catalyst structures, run:
@@ -60,6 +82,7 @@ To generate string representations of catalyst structures, run:
 ```
 python script/generate.py --name <NAME> --ckpt_path <MODEL_PATH> --save_path <SAVE_PATH>
 ```
+
 #### Required Arguments
 - `name`: Name for the generated structures set.
 - `ckpt_path`: Path to the trained generative model checkpoint.
