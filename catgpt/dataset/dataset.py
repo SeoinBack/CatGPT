@@ -27,8 +27,8 @@ class CifDataset(Dataset):
         df = pd.read_csv(csv_fn)
         self.inputs = df.to_dict(orient='records')
         self.tokenizer = tokenizer
-        self.model_type = model_type
         self.data_type = data_type
+        self.model_type = model_type
         self.string_type = string_type
         self.augment_type = augment_type
 
@@ -65,9 +65,10 @@ class CifDataset(Dataset):
         # Count length of input sequences without padding
         if self.model_type == 'GPT':
             input_ids = labels = input_tokens.input_ids[0]
-        #elif self.model_type == 'BERT':
-        #    input_ids = input_tokens.input_ids[0]
-        #    labels = self.get_value_from_key(input_dict, 'corrupted_label')
+            
+        elif self.model_type == 'BERT':
+            input_ids = input_tokens.input_ids[0]
+            labels = self.get_value_from_key(input_dict, 'corruption_label')
 
         return dict(
             input_ids=input_ids,

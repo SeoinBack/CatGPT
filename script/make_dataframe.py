@@ -6,15 +6,18 @@ import argparse
 import pandas as pd
 import numpy as np
 import pickle
+import random
+
 from tqdm import tqdm
 
-from fairchem.core.preprocessing import AtomsToGraphs
 from fairchem.core.datasets import LmdbDataset, data_list_collater
 from fairchem.core.common.relaxation.ase_utils import batch_to_atoms
 
 from ase.io import read
-from catgpt.utils.generation_utils import atoms_to_str
+from catgpt.utils.generation_utils import atoms_to_str, str_to_atoms
+from sklearn.model_selection import train_test_split
 
+random.seed(42)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='convert data to string')
@@ -23,10 +26,68 @@ def parse_args():
     parser.add_argument('--src_path', type=str, help='path to atomistic data to convert', required=True)
     parser.add_argument('--dst_path', type=str, help='path to string data to save', required=True)
     parser.add_argument('--data_type', type=str, help='lmdb or ase', default='lmdb', choices=['ase','lmdb'])
-    
+    parser.add_argument('--corrupt_data', 
+                        action='store_true', 
+                        help='whether to add corrupted data for training detectino model', 
+                        default=False
+                        )
     args = parser.parse_args()
 
     return args
+
+def corrupt_atoms(atoms):
+
+    n_atoms = len(atoms)
+    copy_atoms = atoms.copy()
+    rand = random.random()
+    
+    if rand > 0.5:
+        # delete
+        n_rand = random.choice(range(int(n_atoms*0.2),int(n_atoms*0.8)))
+        rand_idx = random.sample(range(len(atoms)),n_rand)
+        del copy_atoms[rand_idx]
+        
+        return copy_atoms, 'delete', rand_idx
+    else:
+        #scaling
+        scale_rand = random.random()/2 + 1.5
+        copy_atoms.set_cell(copy_atoms.get_cell()*scale_rand,scale_atoms=True)
+        
+        return copy_atoms, 'scaling', scale_rand
+
+def corrupt_data(cat_txt_list):
+    clean_idx, corrupt_idx = train_test_split(
+        range(len(cat_txt_list)), 
+        test_size=0.5, 
+        random_state=42
+    )
+    
+    corrupted_cat_txt_list = []
+    corruption_label_list = []
+    corruption_type_list = []
+    parameter_list = []
+    
+    for idx in tqdm(range(len(cat_txt_list)), desc='Corrupting'):
+        cat_txt = cat_txt_list[idx]
+        if idx in clean_idx:
+            corrupted_cat_txt_list.append(cat_txt)
+            corruption_label_list.append(1)
+            corruption_type_list.append(None)
+            parameter_list.append(None)
+        
+        elif idx in corrupt_idx:
+            atoms, _, _ = str_to_atoms(cat_txt,lat_idx=0)
+            corrupted_atoms, corruption_type, parameter = corrupt_atoms(atoms)
+            corrupted_cat_txt = atoms_to_str(corrupted_atoms, tagged=False)
+            
+            corrupted_cat_txt_list.append(corrupted_cat_txt)
+            corruption_label_list.append(0)
+            corruption_type_list.append(corruption_type)
+            parameter_list.append(parameter)
+        
+    
+    return corrupted_cat_txt_list, corruption_label_list, corruption_type_list, parameter_list
+
 
 def convert(args):
     """
@@ -50,7 +111,7 @@ def convert(args):
         check_key = True
         key_exists = True
                 
-        for i in tqdm(range(len(dataset))):
+        for i in tqdm(range(len(dataset)),desc='Converting'):
             data = dataset[i]
             id_ = data.sid
             
@@ -101,7 +162,14 @@ def convert(args):
     
     if ads_list is not None:
         df['ads_symbol'] = ads_list
-        
+    
+    if args.corrupt_data:
+        corrupted_cat_txt_list, corruption_label_list, corruption_type_list, parameter_list = corrupt_data(cat_txt_list)
+        df['corrupted_cat_txt'] = corrupted_cat_txt_list
+        df['corruption_label'] = corruption_label_list
+        df['corruption_type'] =  corruption_type_list
+        df['parameter'] = parameter_list
+    
     df.to_csv(os.path.join(args.dst_path, args.name + '.csv'))
 
 if __name__ == '__main__':

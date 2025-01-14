@@ -28,7 +28,7 @@ tokenizer = PreTrainedTokenizerFast.from_pretrained(
 
 
 if model_params.architecture == 'GPT':
-    
+    data_type = 'cat_txt'
     base_model = GPT2LMHeadModel
     
     config = GPT2Config(
@@ -39,6 +39,7 @@ if model_params.architecture == 'GPT':
         n_head=model_params.n_head,
     )
 elif model_params.architecture == 'BERT':
+    data_type = 'corrupted_cat_txt'
     base_model = BertForSequenceClassification
     
     config = BertConfig(
@@ -70,8 +71,21 @@ else:
     
 
 dataset = {
-    'train' : CifDataset(data_params.train_data_path, tokenizer, string_type=data_params.string_type),
-    'val' : CifDataset(data_params.val_data_path, tokenizer, string_type=data_params.string_type)
+    'train' : CifDataset(
+        data_params.train_data_path, 
+        tokenizer=tokenizer, 
+        data_type=data_type,
+        model_type=model_params.architecture,
+        string_type=data_params.string_type,
+    ),
+    
+    'val' : CifDataset(
+        data_params.val_data_path, 
+        tokenizer=tokenizer,
+        data_type=data_type,
+        model_type=model_params.architecture,
+        string_type=data_params.string_type,
+    ),
 }
 
 data_collator = DataCollatorForLanguageModeling(
