@@ -63,8 +63,9 @@ class CifDataset(Dataset):
 
         
         # Count length of input sequences without padding
-        if self.model_type == 'GPT':
+        if self.model_type in ['GPT','XLNet']:
             input_ids = labels = input_tokens.input_ids[0]
+            
             
         elif self.model_type == 'BERT':
             input_ids = input_tokens.input_ids[0]
@@ -72,6 +73,7 @@ class CifDataset(Dataset):
 
         return dict(
             input_ids=input_ids,
+            attention_mask=input_tokens.attention_mask[0],
             labels=labels,
         )
 

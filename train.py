@@ -8,6 +8,7 @@ from peft import LoraConfig, get_peft_model
 
 
 from catgpt.modules.trainer import CustomHFTrainer
+from catgpt.modules.models import get_model
 from catgpt.dataset.dataset import CifDataset
 
 from omegaconf import OmegaConf
@@ -16,40 +17,17 @@ from omegaconf import OmegaConf
 import wandb
 os.environ['WANDB_PROJECT'] ='CatGPT'
 
-params = OmegaConf.load('./config/config.yaml')
+params = OmegaConf.load('./config/config.yml')
 model_params = params.model_params
 data_params = params.data_params
-
 
 tokenizer = PreTrainedTokenizerFast.from_pretrained(
     f'./data/tokenizer/{data_params.string_type}-tokenizer/',
     max_len=data_params.max_len
 )
 
+data_type, base_model, config, data_collator = get_model(model_params, tokenizer)
 
-if model_params.architecture == 'GPT':
-    data_type = 'cat_txt'
-    base_model = GPT2LMHeadModel
-    
-    config = GPT2Config(
-        vocab_size=len(tokenizer.get_vocab()),
-        n_positions=model_params.n_positions,
-        n_embd=model_params.n_embd,
-        n_layer=model_params.n_layer,
-        n_head=model_params.n_head,
-    )
-elif model_params.architecture == 'BERT':
-    data_type = 'corrupted_cat_txt'
-    base_model = BertForSequenceClassification
-    
-    config = BertConfig(
-        vocab_size=len(tokenizer.get_vocab()),
-        max_position_embeddings=model_params.n_positions,
-        hidden_size=model_params.n_embd,
-        num_hidden_layers=model_params.n_layer,
-        num_attention_heads=model_params.n_head,
-        num_labels = 1,
-    )
 
 if model_params.use_pretrained:
     model = base_model.from_pretrained(
@@ -63,7 +41,7 @@ if model_params.use_pretrained:
         task_type = model_params.task_type
     )
     
-    if use_lora:
+    if model_params.use_lora:
         model = get_peft_model(model, lora_config)
     
 else:
@@ -87,12 +65,6 @@ dataset = {
         string_type=data_params.string_type,
     ),
 }
-
-data_collator = DataCollatorForLanguageModeling(
-    tokenizer=tokenizer,
-    mlm=False,
-    #return_tensor='pt',
-)
 
 training_args = TrainingArguments(
     output_dir = f'./outputs/{model_params.name}/',
