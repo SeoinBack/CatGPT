@@ -23,16 +23,20 @@ def parse_args():
     parser = argparse.ArgumentParser(description='convert data to string')
 
     parser.add_argument('--name', type=str, help='name of dataset', required=True)
-    parser.add_argument('--src_path', type=str, help='path to atomistic data to convert', required=True)
-    parser.add_argument('--dst_path', type=str, help='path to string data to save', required=True)
-    parser.add_argument('--data_type', type=str, help='lmdb or ase', default='lmdb', choices=['ase','lmdb'])
-    parser.add_argument('--corrupt_data', 
+    parser.add_argument('--src-path', type=str, help='path to atomistic data to convert', required=True)
+    parser.add_argument('--dst-path', type=str, help='path to string data to save', required=True)
+    parser.add_argument('--data-type', type=str, help='lmdb or ase', default='lmdb', choices=['ase','lmdb'])
+    parser.add_argument('--corrupt-data', 
                         action='store_true', 
                         help='whether to add corrupted data for training detectino model', 
                         default=False
+                        )  
+    parser.add_argument('--props',
+                        nargs='+',
+                        choices=['spg','miller','energy','comp'],
+                        help="list of properties to include dataframe, separated by spaces (e.g., --props spg mil energy)"
                         )
     args = parser.parse_args()
-
     return args
 
 def corrupt_atoms(atoms):
@@ -99,12 +103,16 @@ def convert(args):
     id_list = []
     atoms_list = []
     ads_list = None
+    get_energy = False
+    energy_list = []
+    prop_list = []
+    props = args.props
     
-    # Convert lmdb to ase atoms
+    # convert lmdb to ase atoms
     if args.data_type == 'lmdb':
         ads_list = []
         
-        with open(abs_path + '/data/mapping/oc20_data_mapping_symbol_only.pkl','rb') as fr:
+        with open(abs_path + '/data/mapping/oc20_data_mapping_light.pkl','rb') as fr:
             mapping = pickle.load(fr)
                     
         dataset = LmdbDataset({'src':args.src_path})
@@ -115,36 +123,54 @@ def convert(args):
             data = dataset[i]
             id_ = data.sid
             
-            # Adsorbate check
+            # adsorbate check
             if check_key:
                 if 'random'+str(id_) not in mapping.keys():
                     print(f"Warning: Key 'random{id_}' not found in mapping.")
                     key_exists = False
                     ads = None
                 else:
-                    ads = mapping['random'+str(id_)]
+                    ads = mapping['random' + str(id_)]['ads']
                     check_key = False
             elif key_exists:
-                ads = mapping['random' + str(id_)]
+                ads = mapping['random' + str(id_)]['ads']
             
+            # prepare properties
+            if props is not None:
+                if 'energy' in props:
+                    props.remove('energy')
+                    get_energy = True
+                prop_it = []
+                for prop in props:
+                    prop_it.append(mapping['random' + str(id_)][prop])
+                    
             batch = data_list_collater([data])
             
-            # Energy check
-            if ~hasattr(batch,'energy'):
+            # energy check
+            if not hasattr(batch,'energy'):
                 for att in ['y','y_init']:
                     if hasattr(batch,att):
                         batch.energy = getattr(batch, att)
             
-            # Force check
+            # append energy
+            if get_energy:
+                assert hasattr(batch,'energy'), 'There is no energy in dataset'
+                energy_list.append(round(batch.energy.item(),2))
+            
+            # force check
             if ~hasattr(batch,'force') and hasattr(batch,'forces'):
                 batch.force = batch.forces
                 
             atoms = batch_to_atoms(batch)
             
+            if hasattr(data,'fid'):
+                id_ = str(id_) + str(data.fid)
+                
             id_list.append(id_)
             atoms_list.extend(atoms)
             ads_list.append(ads)
-    
+            prop_list.append(prop_it)
+            
     elif args.data_type == 'ase':
         if os.path.isdir(arg.src_path):
             atoms_list = [read(arg.src_path + i) for i in os.listdir(arg.src_path)]
@@ -152,9 +178,9 @@ def convert(args):
             atoms_list = read(arg.src_path, ':')
         id_list = list(range(len(atoms_list)))
     
-    # Convert atoms to string
+    # convert atoms to string
     is_tagged =  2 in atoms_list[0].get_tags()
-    cat_txt_list = [atoms_to_str(atoms,tagged=is_tagged) for atoms in atoms_list]
+    cat_txt_list = [atoms_to_str(atoms,tagged=is_tagged) for atoms in tqdm(atoms_list,desc='Atoms to string')]
     
     df = pd.DataFrame(columns = ['id','cat_txt'])
     df['id'] = id_list
@@ -162,6 +188,15 @@ def convert(args):
     
     if ads_list is not None:
         df['ads_symbol'] = ads_list
+    
+    if props is not None:
+        prop_list = [list(x) for x in zip(*prop_list)]
+        for idx, prop in enumerate(props):
+            df[prop] = prop_list[idx]
+    
+    if get_energy:
+        df['energy'] = energy_list
+        
     
     if args.corrupt_data:
         corrupted_cat_txt_list, corruption_label_list, corruption_type_list, parameter_list = corrupt_data(cat_txt_list)
