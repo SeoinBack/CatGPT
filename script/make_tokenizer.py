@@ -8,15 +8,15 @@ from transformers import PreTrainedTokenizerFast
 def parse_args():
     parser = argparse.ArgumentParser(description='generate tokenizer for CatGPT')
 
-    parser.add_argument('--data_path', type=str, help='base directory to save tokenizer files', required=True)
+    parser.add_argument('--data-path', type=str, help='base directory to save tokenizer files', required=True)
     parser.add_argument(
-        '--token_type', 
+        '--token-type', 
         type=str, 
         help='type of method to tokenize catalysts', 
         required=True, 
-        choices=['digit','coordinate','ads']
+        choices=['digit','coordinate','ads','t5']
     )
-    parser.add_argument('--max_length', type=int, help='max token length', default=1024)
+    parser.add_argument('--max-length', type=int, help='max token length', default=1024)
     
     args = parser.parse_args()
 
@@ -52,6 +52,8 @@ def make_tokenizer(args):
                    '*CHO*CHO', '*CHOHCH2OH', '*CHCHOH', '*OCH2CHOH', '*OH2', '*OHNNCH3', '*N2', '*COHCH2OH', '*COCHO', 
                    '*NO2', '*O', '*CHCO', '*COHCHO', '*CHOHCH2', '*ONH', '*NONH', '*NO']
     
+    EXTRA_IDS = [f"<extra_id_{i}>" for i in range(20)]
+    
     special_tokens = ["<bos>", "<eos>", "<pad>", "<unk>", "<mask>"]
 
     if token_type == 'digit':
@@ -62,6 +64,10 @@ def make_tokenizer(args):
     
     elif token_type == 'ads':
         VOCAB = SYMBOLS + COORDINATES + ATOMS + ADS_SYMBOLS
+    
+    elif token_type == 't5':
+        VOCAB = SYMBOLS + COORDINATES + ATOMS + ADS_SYMBOLS
+        special_tokens = special_tokens + EXTRA_IDS
     
     else:
         raise TypeError(f'Invalid token_type "{token_type}"')

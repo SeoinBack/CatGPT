@@ -11,7 +11,11 @@ model_params:
     n_head: 8
     n_epochs: 1
     d_inner: 1024
-  
+    
+    # for T5
+    noise_density: 0.15
+    mean_span: 3
+    
     # pretrained 
     checkpoint_path: './model/GPT2-2M/'
     

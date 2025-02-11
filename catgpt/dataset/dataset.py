@@ -60,23 +60,37 @@ class CifDataset(Dataset):
             max_length=MAX_LENGTH,
             truncation=True,
         )
-
+        
+        attention_mask = input_tokens.attention_mask[0]
+        input_ids = input_tokens.input_ids[0]
         
         # Count length of input sequences without padding
         if self.model_type in ['GPT','XLNet']:
-            input_ids = labels = input_tokens.input_ids[0]
+            labels = input_ids
             
+            input_dict = dict(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels,
+            )
             
         elif self.model_type == 'BERT':
-            input_ids = input_tokens.input_ids[0]
             labels = self.get_value_from_key(input_dict, 'corruption_label')
-
-        return dict(
-            input_ids=input_ids,
-            attention_mask=input_tokens.attention_mask[0],
-            labels=labels,
-        )
-
+            
+            input_dict = dict(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels,
+            )
+        
+        elif self.model_type == 'T5':
+            input_dict = dict(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+            )
+        
+        return input_dict
+        
     def __len__(self):
         return len(self.inputs)
 
