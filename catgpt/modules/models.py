@@ -53,7 +53,7 @@ def get_model(model_params,tokenizer):
             d_model=model_params.n_embd,
             n_layer=model_params.n_layer,
             n_head=model_params.n_head,
-            #d_inner=
+            d_inner=model_params.d_inner,
         )
         
         data_collator = DataCollatorForPermutationLanguageModeling(

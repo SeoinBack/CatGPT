@@ -10,6 +10,7 @@ model_params:
     n_layer: 12
     n_head: 8
     n_epochs: 1
+    d_inner: 1024
   
     # pretrained 
     checkpoint_path: './model/GPT2-2M/'
