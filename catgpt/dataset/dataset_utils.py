@@ -1,7 +1,7 @@
 import pickle
 import random
-
-from functools import partial
+from math import gcd
+from functools import partial, reduce
 
 def load_pickle(src):
     with open(src,'rb') as fr:
@@ -53,23 +53,32 @@ def permutation(input_str, ads):
     
 
 def str_preprocess(string_type, input_str, augment_type=None, **kwargs):
-    if augment_type == 'permutation':
-        ads = kwargs.get('ads', None)
-        input_str = permutation(input_str, ads)
+    #if augment_type == 'permutation':
+    #    ads = kwargs.get('ads', None)
+    #    input_str = permutation(input_str, ads)
 
-    if string_type == 'coordinate':
+    if string_type in ['coordinate','t5']:
         return to_coordinate(input_str)
         
     elif string_type == 'split':
         return to_split(input_str)
     
-    elif string_type == 'ads':
-        ads = kwargs.get('ads', None)
-        return to_ads(input_str, ads)
+    #elif string_type == 'ads':
+    #    ads = kwargs.get('ads', None)
+    #    return to_ads(input_str, ads)
     
     elif string_type == 'digit':
         return to_digit(input_str)
 
+def prop_preprocess(input_dict):
+    props = ['ads','comp','spg','miller','energy']
+    prop_str_list = []
+    for prop in props:
+        if prop in input_dict.keys():
+            prop_str_list.append(input_dict[prop])
+            
+    prop_str = ' '.join(prop_str_list)
+    return prop_str
 
 def count_ads_atoms(adsorbate_symbol: str) -> int:
     def parse_formula(formula: str) -> dict:
@@ -106,3 +115,39 @@ def count_ads_atoms(adsorbate_symbol: str) -> int:
     total_atoms = sum(atom_counts.values())
     
     return total_atoms
+    
+    
+def simplify_formula(s):
+    tokens = s.split()
+    numbers = []
+    for i, token in enumerate(tokens):
+        if i % 2 == 0:
+            try:
+                int(token)
+                return s
+            except ValueError:
+                continue
+        else:
+
+            try:
+                n = int(token)
+                numbers.append(n)
+            except ValueError:
+                return s
+
+    if len(numbers) < 2:
+        return s
+
+    overall_gcd = reduce(gcd, numbers)
+    if overall_gcd == 1:
+        return s
+
+    new_tokens = []
+    num_idx = 0
+    for i, token in enumerate(tokens):
+        if i % 2 == 0:
+            new_tokens.append(token)
+        else:
+            new_tokens.append(str(numbers[num_idx] // overall_gcd))
+            num_idx += 1
+    return " ".join(new_tokens)

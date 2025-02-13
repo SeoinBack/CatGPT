@@ -18,7 +18,7 @@ def parse_args():
         type=str, 
         help='type of method to tokenize catalysts', 
         required=True, 
-        choices=['digit','coordinate','ads','t5']
+        choices=['digit','coordinate','t5']
     )
     parser.add_argument('--add-props', action='store_true', help='weather to add property tokens', default=False)
     parser.add_argument('--max-length', type=int, help='max token length', default=1024)
@@ -29,9 +29,14 @@ def parse_args():
     
 def make_tokenizer(args):
     
+    if args.add_props:
+        prop = 'prop-'
+    else:
+        prop = ''
+    
     max_length = args.max_length
     token_type = args.token_type
-    data_path = os.path.join(args.data_path, f'{token_type}-tokenizer/')
+    data_path = os.path.join(args.data_path, f'{token_type}-{prop}tokenizer/')
     os.makedirs(data_path, exist_ok=True)
     
     # Elemental symbols
@@ -43,8 +48,8 @@ def make_tokenizer(args):
 
     # Digits for lattices and fractiaonl coordinates
     DIGITS = [str(d) for d in list(range(10))] # '0' ~ '9'
-    COORDINATES = ["{0:.3f}".format(d) for d in list(np.linspace(0,1,1001))]
-    
+    COORDINATES = ['{0:.3f}'.format(d) for d in list(np.linspace(0,1,1001))]
+    ENERGIES = ['{0:.1f}'.format(d) for d in np.round(np.arange(-10.0,10.1,0.1),1)]
     
     # Symbols for decimal and etc
     SYMBOLS = ['.']
@@ -96,19 +101,17 @@ def make_tokenizer(args):
     elif token_type == 'coordinate':
         VOCAB = SYMBOLS + COORDINATES + ATOMS
     
-    elif token_type == 'ads':
-        VOCAB = SYMBOLS + COORDINATES + ATOMS + ADS_SYMBOLS
-    
     elif token_type == 't5':
-        VOCAB = SYMBOLS + COORDINATES + ATOMS + ADS_SYMBOLS
+        VOCAB = SYMBOLS + COORDINATES + ATOMS
         special_tokens = special_tokens + EXTRA_IDS
     
     else:
         raise TypeError(f'Invalid token_type "{token_type}"')
     
-    if add_props:
-        VOCAB += SPACE_GROUPS + MILLER_INDICES
-        
+    if args.add_props:
+        VOCAB += ADS_SYMBOLS + SPACE_GROUPS + MILLER_INDICES
+        if token_type != 'digit':
+            VOCAB += DIGITS + ENERGIES
     
     # Construct vocabulary dictionary
     VOCAB_dict = {v: i for i, v in enumerate(special_tokens + VOCAB)}
@@ -145,7 +148,7 @@ def make_tokenizer(args):
     )    
             
     wrapped_tokenizer.save_pretrained(data_path)
-    print(f"{token_type}-tokenizer saved at: {data_path}")
+    print(f"{token_type}-{prop}tokenizer saved at: {data_path}")
   
 if __name__ == '__main__':
     args = parse_args()

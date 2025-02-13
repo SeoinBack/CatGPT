@@ -7,6 +7,9 @@ import pandas as pd
 import numpy as np
 import pickle
 import random
+import multiprocessing as mp
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 from tqdm import tqdm
 
@@ -31,13 +34,31 @@ def parse_args():
                         help='whether to add corrupted data for training detectino model', 
                         default=False
                         )  
+    parser.add_argument('--num-workers',
+                        type=int,
+                        default=1,
+                        help='no. of processes',    
+                        )
     parser.add_argument('--props',
                         nargs='+',
-                        choices=['spg','miller','energy','comp'],
+                        choices=['ads','spg','miller','energy','comp'],
                         help="list of properties to include dataframe, separated by spaces (e.g., --props spg mil energy)"
                         )
     args = parser.parse_args()
     return args
+
+g_mapping = None
+g_props = None
+g_get_energy = False
+g_dataset = None
+
+
+def init_worker(args, mapping, props, get_energy):
+    global g_mapping, g_props, g_get_energy, g_dataset
+    g_mapping = mapping
+    g_props = props
+    g_get_energy = get_energy
+    g_dataset = LmdbDataset({'src': args.src_path})
 
 def corrupt_atoms(atoms):
 
@@ -92,7 +113,54 @@ def corrupt_data(cat_txt_list):
     
     return corrupted_cat_txt_list, corruption_label_list, corruption_type_list, parameter_list
 
+def process_item(i):
+    global g_mapping, g_props, g_get_energy, g_dataset
+    data = g_dataset[i]
+    id_ = data.sid
+    key = 'random' + str(id_)
+    
+    #if key in g_mapping:
+    #    ads = g_mapping[key]['ads']
+    #else:
+    #    ads = None
+    #    print(f"Warning: Key '{key}' not found in mapping.")
+    
+    prop_it = []
+    if g_props is not None:
+        for prop in g_props:
+            prop_it.append(g_mapping.get(key, {}).get(prop, None))
+    
+    batch = data_list_collater([data])
+    
+    energy_att = 'energy'
+    if not hasattr(batch, energy_att):
+        for att in ['y_init','y']:
+            if hasattr(batch, att):
+                energy_att = att
+                break
+                
+    energy_str = None
+    if g_get_energy:
+        if not hasattr(batch, energy_att):
+            raise AssertionError('There is no energy in dataset')
+        energy = getattr(batch,energy_att).item()
+        energy_val = max(-10,min(round(energy/2,2)*2,10))
+        energy_str = f'{energy_val:.1f}'
+    
+    if not hasattr(batch, 'force') and hasattr(batch, 'forces'):
+        batch.force = batch.forces
+    
+    atoms = batch_to_atoms(batch)
+    
+    if hasattr(data, 'fid'):
+        id_ = str(id_) + '_' + str(data.fid)
+    
+    return (id_, atoms, prop_it, energy_str)
 
+def process_atoms_to_str(args):
+    atoms, tagged = args
+    return atoms_to_str(atoms, tagged=tagged)
+    
 def convert(args):
     """
     Convert data to dataframe with string representation
@@ -102,74 +170,54 @@ def convert(args):
 
     id_list = []
     atoms_list = []
-    ads_list = None
-    get_energy = False
+    #ads_list = None
     energy_list = []
     prop_list = []
-    props = args.props
     
+    local_props = None
+    if args.props is not None:
+        local_props = list(args.props)
+        
     # convert lmdb to ase atoms
     if args.data_type == 'lmdb':
-        ads_list = []
+        #ads_list = []
         
-        with open(abs_path + '/data/mapping/oc20_data_mapping_light.pkl','rb') as fr:
+        mapping_path = os.path.join(abs_path, 'data/mapping/oc20_data_mapping_light.pkl')
+        with open(mapping_path, 'rb') as fr:
             mapping = pickle.load(fr)
                     
-        dataset = LmdbDataset({'src':args.src_path})
-        check_key = True
-        key_exists = True
-                
-        for i in tqdm(range(len(dataset)),desc='Converting'):
-            data = dataset[i]
-            id_ = data.sid
-            
-            # adsorbate check
-            if check_key:
-                if 'random'+str(id_) not in mapping.keys():
-                    print(f"Warning: Key 'random{id_}' not found in mapping.")
-                    key_exists = False
-                    ads = None
-                else:
-                    ads = mapping['random' + str(id_)]['ads']
-                    check_key = False
-            elif key_exists:
-                ads = mapping['random' + str(id_)]['ads']
-            
-            # prepare properties
-            if props is not None:
-                if 'energy' in props:
-                    props.remove('energy')
-                    get_energy = True
-                prop_it = []
-                for prop in props:
-                    prop_it.append(mapping['random' + str(id_)][prop])
-                    
-            batch = data_list_collater([data])
-            
-            # energy check
-            if not hasattr(batch,'energy'):
-                for att in ['y','y_init']:
-                    if hasattr(batch,att):
-                        batch.energy = getattr(batch, att)
-            
-            # append energy
-            if get_energy:
-                assert hasattr(batch,'energy'), 'There is no energy in dataset'
-                energy_list.append(round(batch.energy.item(),2))
-            
-            # force check
-            if ~hasattr(batch,'force') and hasattr(batch,'forces'):
-                batch.force = batch.forces
-                
-            atoms = batch_to_atoms(batch)
-            
-            if hasattr(data,'fid'):
-                id_ = str(id_) + str(data.fid)
-                
+        dataset_temp = LmdbDataset({'src':args.src_path})
+        n_items = len(dataset_temp)
+        del dataset_temp
+        
+        # process energy if present
+        get_energy = False
+        if local_props is not None:
+            if 'energy' in local_props:
+                get_energy = True
+                local_props = [p for p in local_props if p != 'energy']
+        
+        # set up MP
+        pool = mp.Pool(processes=args.num_workers,
+               initializer=init_worker,
+               initargs=(args, mapping, local_props, get_energy))
+               
+        # process items
+        results = list(tqdm(pool.imap(process_item, range(n_items)),
+                            total=n_items,
+                            desc="Converting"))
+                                
+        pool.close()
+        pool.join()        
+        
+        for res in results:
+            id_, atoms_res, prop_it, energy_str = res
             id_list.append(id_)
-            atoms_list.extend(atoms)
-            ads_list.append(ads)
+            atoms_list.extend(atoms_res)  # Note: atoms_res is a list.
+            #ads_list.append(ads)
             prop_list.append(prop_it)
+            if get_energy:
+                energy_list.append(energy_str)                
             
     elif args.data_type == 'ase':
         if os.path.isdir(arg.src_path):
@@ -180,24 +228,29 @@ def convert(args):
     
     # convert atoms to string
     is_tagged =  2 in atoms_list[0].get_tags()
-    cat_txt_list = [atoms_to_str(atoms,tagged=is_tagged) for atoms in tqdm(atoms_list,desc='Atoms to string')]
+    atoms_args = [(atoms, is_tagged) for atoms in atoms_list]
+    
+    with mp.Pool(processes=args.num_workers) as pool:
+        cat_txt_list = list(tqdm(pool.imap(process_atoms_to_str, atoms_args),
+                                 total=len(atoms_args),
+                                 desc="Converting atoms to string"))
     
     df = pd.DataFrame(columns = ['id','cat_txt'])
     df['id'] = id_list
     df['cat_txt'] = cat_txt_list
     
-    if ads_list is not None:
-        df['ads_symbol'] = ads_list
+    #if ads_list is not None:
+    #    df['ads_symbol'] = ads_list
     
-    if props is not None:
-        prop_list = [list(x) for x in zip(*prop_list)]
-        for idx, prop in enumerate(props):
-            df[prop] = prop_list[idx]
+    # add props
+    if local_props is not None and len(prop_list) > 0:
+        prop_list_transposed = [list(x) for x in zip(*prop_list)]
+        for idx, prop in enumerate(local_props):
+            df[prop] = prop_list_transposed[idx]
     
-    if get_energy:
+    if args.data_type == 'lmdb' and local_props is not None and get_energy:
         df['energy'] = energy_list
         
-    
     if args.corrupt_data:
         corrupted_cat_txt_list, corruption_label_list, corruption_type_list, parameter_list = corrupt_data(cat_txt_list)
         df['corrupted_cat_txt'] = corrupted_cat_txt_list
@@ -205,8 +258,10 @@ def convert(args):
         df['corruption_type'] =  corruption_type_list
         df['parameter'] = parameter_list
     
-    df.to_csv(os.path.join(args.dst_path, args.name + '.csv'))
-
+    output_csv = os.path.join(args.dst_path, args.name + '.csv')
+    df.to_csv(output_csv, index=True)
+    print(f"Data saved to {output_csv}")
+    
 if __name__ == '__main__':
     args = parse_args()
     convert(args) 

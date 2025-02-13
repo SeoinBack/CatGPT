@@ -1,7 +1,7 @@
 import pandas as pd
 
 from torch.utils.data import Dataset
-from catgpt.dataset.dataset_utils import str_preprocess
+from catgpt.dataset.dataset_utils import str_preprocess, prop_preprocess
 
 MAX_LENGTH =  1024
 
@@ -20,6 +20,7 @@ class CifDataset(Dataset):
         data_type='cat_txt',
         model_type='GPT',
         string_type='coordinate',
+        add_props=False,
         augment_type=None,
     ):
         super().__init__()
@@ -31,6 +32,7 @@ class CifDataset(Dataset):
         self.model_type = model_type
         self.string_type = string_type
         self.augment_type = augment_type
+        self.add_props = add_props
 
     def get_value_from_key(self, input_dict, key):
         return input_dict[key]
@@ -38,19 +40,25 @@ class CifDataset(Dataset):
     def tokenize(self, input_dict):
         input_str = self.get_value_from_key(input_dict, self.data_type)
         
-        if self.string_type == 'ads':
-            ads = self.get_value_from_key(input_dict, 'ads_symbol')
-        else:
-            ads = None
+        #if self.string_type == 'ads':
+        #    ads = self.get_value_from_key(input_dict, 'ads_symbol')
+        #else:
+        #    ads = None
         
         input_str = str_preprocess(
                 string_type=self.string_type, 
                 input_str=input_str, 
                 augment_type=self.augment_type,
-                ads=ads
+        #        ads=ads
                 )
         
-        # Tokenize crystal strings with bos and eos token
+        if self.add_props:
+            prop_str = prop_preprocess(
+                input_dict
+                )
+            input_str = ' '.join([prop_str,input_str])
+        
+        # tokenize crystal strings with bos and eos token
         input_tokens = self.tokenizer(
             ' '.join([self.tokenizer.bos_token, input_str, '.', self.tokenizer.eos_token]),
             padding='max_length',
@@ -64,7 +72,7 @@ class CifDataset(Dataset):
         attention_mask = input_tokens.attention_mask[0]
         input_ids = input_tokens.input_ids[0]
         
-        # Count length of input sequences without padding
+        # count length of input sequences without padding
         if self.model_type in ['GPT','XLNet']:
             labels = input_ids
             

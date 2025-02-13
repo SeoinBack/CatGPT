@@ -21,8 +21,13 @@ params = OmegaConf.load('./config/config.yml')
 model_params = params.model_params
 data_params = params.data_params
 
+if data_params.add_props:
+    props = 'prop-'
+else:
+    props = ''
+
 tokenizer = PreTrainedTokenizerFast.from_pretrained(
-    f'./data/tokenizer/{data_params.string_type}-tokenizer/',
+    f'./data/tokenizer/{data_params.string_type}-{props}tokenizer/',
     max_len=data_params.max_len
 )
 
@@ -55,6 +60,7 @@ dataset = {
         data_type=data_type,
         model_type=model_params.architecture,
         string_type=data_params.string_type,
+        add_props=data_params.add_props,
     ),
     
     'val' : CifDataset(
@@ -63,6 +69,7 @@ dataset = {
         data_type=data_type,
         model_type=model_params.architecture,
         string_type=data_params.string_type,
+        add_props=data_params.add_props,
     ),
 }
 
