@@ -8,7 +8,7 @@ from transformers import (
     DataCollatorForSeq2Seq,
 )
 
-from catgpt.modules.t5_modules import DataCollatorForT5MLM
+from catgpt.modules.t5_modules import DataCollatorForT5MLM, compute_input_and_target_lengths
 from catgpt.dataset.dataset import CifDataset
 
 import torch
@@ -110,7 +110,7 @@ def get_model(model_params, data_params, tokenizer):
             data_type=data_type,
             model_type=model_params.architecture,
             string_type=data_params.string_type,
-            max_length=data_parmas.max_len,
+            max_length=data_params.max_len,
             add_props=data_params.add_props,
         ),
         
@@ -120,7 +120,7 @@ def get_model(model_params, data_params, tokenizer):
             data_type=data_type,
             model_type=model_params.architecture,
             string_type=data_params.string_type,
-            max_length=data_parmas.max_len,
+            max_length=data_pars.max_len,
             add_props=data_params.add_props,
         ),
     }

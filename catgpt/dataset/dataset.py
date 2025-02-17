@@ -20,7 +20,7 @@ class CifDataset(Dataset):
         data_type='cat_txt',
         model_type='GPT',
         string_type='coordinate',
-        max_lenght=1024,
+        max_length=1024,
         add_props=False,
         augment_type=None,
     ):
