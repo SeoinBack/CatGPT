@@ -40,7 +40,7 @@ else:
 
 
 
-data_type, base_model, config, dataset, data_collator = get_model(model_params, data_params, tokenizer)
+base_model, config, dataset, data_collator = get_model(model_params, data_params, tokenizer)
 
 
 if model_params.use_pretrained:

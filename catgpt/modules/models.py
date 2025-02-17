@@ -70,58 +70,58 @@ def get_model(model_params, data_params, tokenizer):
                 plm_probability=model_params.noise_density
             )
         
-        elif arch == 'T5':
-            data_type = 'cat_txt'
-            base_model = T5ForConditionalGeneration
-            config = T5Config(
-                vocab_size=len(tokenizer.get_vocab()),
-                d_model=model_params.n_embd,
-                d_kv=(model_params.n_embd // model_params.n_head) if model_params.n_head > 0 else 64,
-                d_ff=model_params.n_embd * 4,
-                num_layers=model_params.n_layer,
-                num_heads=model_params.n_head,
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id,
-                decoder_start_token_id=tokenizer.bos_token_id,
-            )
-            
-            expanded_inputs_length, targets_length = compute_input_and_target_lengths(
-                inputs_length=data_params.max_len,
-                noise_density=model_params.noise_density,
-                mean_noise_span_length=model_params.mean_span,
-            )  
-            
-            data_collator = DataCollatorForT5MLM(
-                tokenizer=tokenizer,
-                noise_density=model_params.noise_density,
-                mean_noise_span_length=model_params.mean_span,
-                input_length=data_params.max_len,          
-                target_length=targets_length,
-                pad_token_id=tokenizer.pad_token_id,
-                decoder_start_token_id=tokenizer.bos_token_id,               
-            )
-            
-            data_params.max_len = expanded_inputs_length
+    elif arch == 'T5':
+        data_type = 'cat_txt'
+        base_model = T5ForConditionalGeneration
+        config = T5Config(
+            vocab_size=len(tokenizer.get_vocab()),
+            d_model=model_params.n_embd,
+            d_kv=(model_params.n_embd // model_params.n_head) if model_params.n_head > 0 else 64,
+            d_ff=model_params.n_embd * 4,
+            num_layers=model_params.n_layer,
+            num_heads=model_params.n_head,
+            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+            decoder_start_token_id=tokenizer.bos_token_id,
+        )
         
-        dataset = {
-            'train' : CifDataset(
-                data_params.train_data_path, 
-                tokenizer=tokenizer, 
-                data_type=data_type,
-                model_type=model_params.architecture,
-                string_type=data_params.string_type,
-                max_length=data_parmas.max_len,
-                add_props=data_params.add_props,
-            ),
-            
-            'val' : CifDataset(
-                data_params.val_data_path, 
-                tokenizer=tokenizer,
-                data_type=data_type,
-                model_type=model_params.architecture,
-                string_type=data_params.string_type,
-                max_length=data_parmas.max_len,
-                add_props=data_params.add_props,
-            ),
-        }
-    return data_type, base_model, config, dataset, data_collator
+        expanded_inputs_length, targets_length = compute_input_and_target_lengths(
+            inputs_length=data_params.max_len,
+            noise_density=model_params.noise_density,
+            mean_noise_span_length=model_params.mean_span,
+        )  
+        
+        data_collator = DataCollatorForT5MLM(
+            tokenizer=tokenizer,
+            noise_density=model_params.noise_density,
+            mean_noise_span_length=model_params.mean_span,
+            input_length=data_params.max_len,          
+            target_length=targets_length,
+            pad_token_id=tokenizer.pad_token_id,
+            decoder_start_token_id=tokenizer.bos_token_id,               
+        )
+        
+        data_params.max_len = expanded_inputs_length
+    
+    dataset = {
+        'train' : CifDataset(
+            data_params.train_data_path, 
+            tokenizer=tokenizer, 
+            data_type=data_type,
+            model_type=model_params.architecture,
+            string_type=data_params.string_type,
+            max_length=data_parmas.max_len,
+            add_props=data_params.add_props,
+        ),
+        
+        'val' : CifDataset(
+            data_params.val_data_path, 
+            tokenizer=tokenizer,
+            data_type=data_type,
+            model_type=model_params.architecture,
+            string_type=data_params.string_type,
+            max_length=data_parmas.max_len,
+            add_props=data_params.add_props,
+        ),
+    }
+    return base_model, config, dataset, data_collator
