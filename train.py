@@ -9,6 +9,7 @@ from peft import LoraConfig, get_peft_model
 
 from catgpt.modules.trainer import CustomHFTrainer
 from catgpt.modules.models import get_model
+from catgpt.modules.tokenizers import T5TokenizerForCat
 from catgpt.dataset.dataset import CifDataset
 
 from omegaconf import OmegaConf
@@ -26,12 +27,20 @@ if data_params.add_props:
 else:
     props = ''
 
-tokenizer = PreTrainedTokenizerFast.from_pretrained(
-    f'./data/tokenizer/{data_params.string_type}-{props}tokenizer/',
-    max_len=data_params.max_len
-)
+if data_params.string_type == 't5':
+    tokenizer = T5TokenizerForCat.from_pretrained(
+            f'./data/tokenizer/t5-{props}tokenizer/',
+    )
 
-data_type, base_model, config, data_collator = get_model(model_params, tokenizer)
+else:
+    tokenizer = PreTrainedTokenizerFast.from_pretrained(
+        f'./data/tokenizer/{data_params.string_type}-{props}tokenizer/',
+        max_len=data_params.max_len
+    )
+
+
+
+data_type, base_model, config, dataset, data_collator = get_model(model_params, data_params, tokenizer)
 
 
 if model_params.use_pretrained:
@@ -52,7 +61,7 @@ if model_params.use_pretrained:
 else:
     model =  base_model(config=config)
     
-
+"""
 dataset = {
     'train' : CifDataset(
         data_params.train_data_path, 
@@ -72,6 +81,7 @@ dataset = {
         add_props=data_params.add_props,
     ),
 }
+"""
 
 training_args = TrainingArguments(
     output_dir = f'./outputs/{model_params.name}/',

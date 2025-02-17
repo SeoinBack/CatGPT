@@ -11,6 +11,9 @@ import multiprocessing as mp
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+import logging
+logging.getLogger().setLevel(logging.ERROR)
+
 from tqdm import tqdm
 
 from fairchem.core.datasets import LmdbDataset, data_list_collater

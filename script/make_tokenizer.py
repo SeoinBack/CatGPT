@@ -1,9 +1,12 @@
+import sys, os
+abs_path = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
+sys.path.append(abs_path)
+
 import numpy as np
 import argparse
-import os
-
 import tokenizers
 
+from catgpt.modules.tokenizers import T5TokenizerForCat
 from tokenizers import PreTokenizedString
 from tokenizers.pre_tokenizers import PreTokenizer
 from tokenizers.processors import TemplateProcessing
@@ -20,7 +23,7 @@ def parse_args():
         required=True, 
         choices=['digit','coordinate','t5']
     )
-    parser.add_argument('--add-props', action='store_true', help='weather to add property tokens', default=False)
+    parser.add_argument('--add-props', action='store_true', help='whether to add property tokens', default=False)
     parser.add_argument('--max-length', type=int, help='max token length', default=1024)
     
     args = parser.parse_args()
@@ -91,8 +94,6 @@ def make_tokenizer(args):
                       '(1,-2,-2)', '(1,2,0)', '(2,-1,-1)', '(2,1,1)', '(0,2,1)', '(1,-2,1)', '(1,0,-1)', '(2,-1,2)', 
                       '(0,1,-1)', '(2,0,1)', '(0,1,2)', '(1,-2,0)', '(2,-1,-2)', '(1,-1,-1)', '(2,1,2)', '(2,1,-2)']
     
-    EXTRA_IDS = [f"<extra_id_{i}>" for i in range(20)]
-    
     special_tokens = ["<bos>", "<eos>", "<pad>", "<unk>", "<mask>"]
 
     if token_type == 'digit':
@@ -103,7 +104,6 @@ def make_tokenizer(args):
     
     elif token_type == 't5':
         VOCAB = SYMBOLS + COORDINATES + ATOMS
-        special_tokens = special_tokens + EXTRA_IDS
     
     else:
         raise TypeError(f'Invalid token_type "{token_type}"')
@@ -112,6 +112,13 @@ def make_tokenizer(args):
         VOCAB += ADS_SYMBOLS + SPACE_GROUPS + MILLER_INDICES
         if token_type != 'digit':
             VOCAB += DIGITS + ENERGIES
+    
+    if token_type == 't5':
+        wrapped_tokenizer = T5TokenizerForCat(VOCAB, extra_ids=20)
+        wrapped_tokenizer.save_pretrained(data_path)
+        print(f"{token_type}-{prop}tokenizer saved at: {data_path}")
+        return None
+        
     
     # Construct vocabulary dictionary
     VOCAB_dict = {v: i for i, v in enumerate(special_tokens + VOCAB)}

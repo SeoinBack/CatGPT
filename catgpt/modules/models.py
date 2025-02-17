@@ -7,259 +7,121 @@ from transformers import (
     DataCollatorForPermutationLanguageModeling,
     DataCollatorForSeq2Seq,
 )
-from transformers import (
-    BatchEncoding,
-    PreTrainedTokenizerBase,
-)
-from dataclasses import dataclass
-from typing import Dict, List
+
+from catgpt.modules.t5_modules import DataCollatorForT5MLM
+from catgpt.dataset.dataset import CifDataset
 
 import torch
 import numpy as np
 
-def get_model(model_params,tokenizer):
+def get_model(model_params, data_params, tokenizer):
     
     arch = model_params.architecture
     assert arch in ['GPT','BERT','XLNet','T5']
     
-    if arch == 'GPT':
-        data_type = 'cat_txt'
-        base_model = GPT2LMHeadModel
-        config = GPT2Config(
-            vocab_size=len(tokenizer.get_vocab()),
-            n_positions=model_params.n_positions,
-            n_embd=model_params.n_embd,
-            n_layer=model_params.n_layer,
-            n_head=model_params.n_head,
-        )
-         
-        data_collator = DataCollatorForLanguageModeling(
-            tokenizer=tokenizer,
-            mlm=False,
-        )
-
-          
-    elif arch == 'BERT':
-        data_type = 'corrupted_cat_txt'
-        base_model = BertForSequenceClassification
-        config = BertConfig(
-            vocab_size=len(tokenizer.get_vocab()),
-            max_position_embeddings=model_params.n_positions,
-            hidden_size=model_params.n_embd,
-            num_hidden_layers=model_params.n_layer,
-            num_attention_heads=model_params.n_head,
-            num_labels = 1,
-        )
-        
-        data_collator = DataCollatorWithPadding(
-            tokenizer=tokenizer,
-            padding=True,
-        )
-        
-    elif arch == 'XLNet':
-        data_type = 'cat_txt'
-        base_model = XLNetLMHeadModel
-        config = XLNetConfig(
-            vocab_size=len(tokenizer.get_vocab()),
-            d_model=model_params.n_embd,
-            n_layer=model_params.n_layer,
-            n_head=model_params.n_head,
-            d_inner=model_params.d_inner,
-        )
-        
-        data_collator = DataCollatorForPermutationLanguageModeling(
-            tokenizer=tokenizer,
-            plm_probability=1.0,
-        )
-        
-    elif arch == 'T5':
-        data_type = 'cat_txt'
-        base_model = T5ForConditionalGeneration
-        config = T5Config(
-            vocab_size=len(tokenizer.get_vocab()),
-            d_model=model_params.n_embd,
-            d_kv=(model_params.n_embd // model_params.n_head) if model_params.n_head > 0 else 64,
-            d_ff=model_params.n_embd * 4,
-            num_layers=model_params.n_layer,
-            num_heads=model_params.n_head,
-            pad_token_id=tokenizer.pad_token_id,
-            eos_token_id=tokenizer.eos_token_id,
-            decoder_start_token_id=tokenizer.bos_token_id,
-        )
-        
-        data_collator = DataCollatorForT5MLM(
-            tokenizer=tokenizer,
-            noise_density=model_params.noise_density,
-            mean_noise_span_length=model_params.mean_span,
-            input_length=model_params.n_positions,          
-            target_length=model_params.n_positions,
-            pad_token_id=tokenizer.pad_token_id,
-            decoder_start_token_id=tokenizer.bos_token_id,               
-        )
-        
-    return data_type, base_model, config, data_collator
-
-@dataclass
-class DataCollatorForT5MLM:
-    """
-    Data collator used for T5 span-masked language modeling.
-    It is made sure that after masking the inputs are of length `data_args.max_seq_length` and targets are also of fixed length.
-    For more information on how T5 span-masked language modeling works, one can take a look
-    at the `official paper <https://arxiv.org/pdf/1910.10683.pdf>`__
-    or the `official code for preprocessing <https://github.com/google-research/text-to-text-transfer-transformer/blob/master/t5/data/preprocessors.py>`__ .
-    Args:
-        tokenizer (:class:`~transformers.PreTrainedTokenizer` or :class:`~transformers.PreTrainedTokenizerFast`):
-            The tokenizer used for encoding the data.
-        noise_density (:obj:`float`):
-            The probability with which to (randomly) mask tokens in the input.
-        mean_noise_span_length (:obj:`float`):
-            The average span length of the masked tokens.
-        input_length (:obj:`int`):
-            The expected input length after masking.
-        target_length (:obj:`int`):
-            The expected target length after masking.
-        pad_token_id: (:obj:`int`):
-            The pad token id of the model
-        decoder_start_token_id: (:obj:`int):
-            The decoder start token id of the model
-    """
-
-    tokenizer: PreTrainedTokenizerBase
-    noise_density: float
-    mean_noise_span_length: float
-    input_length: int
-    target_length: int
-    pad_token_id: int
-    decoder_start_token_id: int
-
-    def __call__(self, examples: List[Dict[str, np.ndarray]]) -> Dict[str, np.ndarray]:
-
-        # convert list to dict and tensorize input
-        batch = BatchEncoding(
-            {k: np.array([examples[i][k] for i in range(len(examples))]) for k, v in examples[0].items()}
-        )
-
-        input_ids = batch["input_ids"]
-        batch_size, expandend_input_length = input_ids.shape
-
-        mask_indices = np.asarray([self.random_spans_noise_mask(expandend_input_length) for i in range(batch_size)])
-        labels_mask = ~mask_indices
-
-        input_ids_sentinel = self.create_sentinel_ids(mask_indices.astype(np.int8))
-        labels_sentinel = self.create_sentinel_ids(labels_mask.astype(np.int8))
-        
-        batch["input_ids"] = self.filter_input_ids(input_ids, input_ids_sentinel)
-        batch["labels"] = self.filter_input_ids(input_ids, labels_sentinel)
-
-        if batch["input_ids"].shape[-1] != self.input_length:
-            raise ValueError(
-                f"`input_ids` are incorrectly preprocessed. `input_ids` length is {batch['input_ids'].shape[-1]}, but"
-                f" should be {self.input_length}."
+    if arch in ['GPT','BERT','XLNet']:
+        if arch == 'GPT':
+            data_type = 'cat_txt'
+            base_model = GPT2LMHeadModel
+            config = GPT2Config(
+                vocab_size=len(tokenizer.get_vocab()),
+                n_positions=model_params.n_positions,
+                n_embd=model_params.n_embd,
+                n_layer=model_params.n_layer,
+                n_head=model_params.n_head,
             )
-
-        if batch["labels"].shape[-1] != self.target_length:
-            raise ValueError(
-                f"`labels` are incorrectly preprocessed. `labels` length is {batch['labels'].shape[-1]}, but should be"
-                f" {self.target_length}."
+             
+            data_collator = DataCollatorForLanguageModeling(
+                tokenizer=tokenizer,
+                mlm=False,
             )
-
-        batch["decoder_input_ids"] = shift_tokens_right(
-            batch["labels"], self.pad_token_id, self.decoder_start_token_id
-        )
-
-        for key, value in batch.items():
-            batch[key] = torch.tensor(value)
-
-        return batch
-
-    def create_sentinel_ids(self, mask_indices):
-        """
-        Sentinel ids creation given the indices that should be masked.
-        The start indices of each mask are replaced by the sentinel ids in increasing
-        order. Consecutive mask indices to be deleted are replaced with `-1`.
-        """
-        start_indices = mask_indices - np.roll(mask_indices, 1, axis=-1) * mask_indices
-        start_indices[:, 0] = mask_indices[:, 0]
-
-        sentinel_ids = np.where(start_indices != 0, np.cumsum(start_indices, axis=-1), start_indices)
-        sentinel_ids = np.where(sentinel_ids != 0, (len(self.tokenizer) - sentinel_ids), 0)
-        sentinel_ids -= mask_indices - start_indices
-
-        return sentinel_ids
-
-    def filter_input_ids(self, input_ids, sentinel_ids):
-        """
-        Puts sentinel mask on `input_ids` and fuse consecutive mask tokens into a single mask token by deleting.
-        This will reduce the sequence length from `expanded_inputs_length` to `input_length`.
-        """
-        batch_size = input_ids.shape[0]
-
-        input_ids_full = np.where(sentinel_ids != 0, sentinel_ids, input_ids)
-        # input_ids tokens and sentinel tokens are >= 0, tokens < 0 are
-        # masked tokens coming after sentinel tokens and should be removed
-        input_ids = input_ids_full[input_ids_full >= 0].reshape((batch_size, -1))
-        input_ids = np.concatenate(
-            [input_ids, np.full((batch_size, 1), self.tokenizer.eos_token_id, dtype=np.int32)], axis=-1
-        )
-        return input_ids
-
-    def random_spans_noise_mask(self, length):
-
-        """This function is copy of `random_spans_helper <https://github.com/google-research/text-to-text-transfer-transformer/blob/84f8bcc14b5f2c03de51bd3587609ba8f6bbd1cd/t5/data/preprocessors.py#L2682>`__ .
-        Noise mask consisting of random spans of noise tokens.
-        The number of noise tokens and the number of noise spans and non-noise spans
-        are determined deterministically as follows:
-        num_noise_tokens = round(length * noise_density)
-        num_nonnoise_spans = num_noise_spans = round(num_noise_tokens / mean_noise_span_length)
-        Spans alternate between non-noise and noise, beginning with non-noise.
-        Subject to the above restrictions, all masks are equally likely.
-        Args:
-            length: an int32 scalar (length of the incoming token sequence)
-            noise_density: a float - approximate density of output mask
-            mean_noise_span_length: a number
-        Returns:
-            a boolean tensor with shape [length]
-        """
-
-        orig_length = length
-
-        num_noise_tokens = int(np.round(length * self.noise_density))
-        # avoid degeneracy by ensuring positive numbers of noise and nonnoise tokens.
-        num_noise_tokens = min(max(num_noise_tokens, 1), length - 1)
-        num_noise_spans = int(np.round(num_noise_tokens / self.mean_noise_span_length))
-
-        # avoid degeneracy by ensuring positive number of noise spans
-        num_noise_spans = max(num_noise_spans, 1)
-        num_nonnoise_tokens = length - num_noise_tokens
-
-        # pick the lengths of the noise spans and the non-noise spans
-        def _random_segmentation(num_items, num_segments):
-            """Partition a sequence of items randomly into non-empty segments.
-            Args:
-                num_items: an integer scalar > 0
-                num_segments: an integer scalar in [1, num_items]
-            Returns:
-                a Tensor with shape [num_segments] containing positive integers that add
-                up to num_items
-            """
-            mask_indices = np.arange(num_items - 1) < (num_segments - 1)
-            np.random.shuffle(mask_indices)
-            first_in_segment = np.pad(mask_indices, [[1, 0]])
-            segment_id = np.cumsum(first_in_segment)
-            # count length of sub segments assuming that list is sorted
-            _, segment_length = np.unique(segment_id, return_counts=True)
-            return segment_length
-
-        noise_span_lengths = _random_segmentation(num_noise_tokens, num_noise_spans)
-        nonnoise_span_lengths = _random_segmentation(num_nonnoise_tokens, num_noise_spans)
-
-        interleaved_span_lengths = np.reshape(
-            np.stack([nonnoise_span_lengths, noise_span_lengths], axis=1), [num_noise_spans * 2]
-        )
-        span_starts = np.cumsum(interleaved_span_lengths)[:-1]
-        span_start_indicator = np.zeros((length,), dtype=np.int8)
-        span_start_indicator[span_starts] = True
-        span_num = np.cumsum(span_start_indicator)
-        is_noise = np.equal(span_num % 2, 1)
-
-        return is_noise[:orig_length]
+    
+              
+        elif arch == 'BERT':
+            data_type = 'corrupted_cat_txt'
+            base_model = BertForSequenceClassification
+            config = BertConfig(
+                vocab_size=len(tokenizer.get_vocab()),
+                max_position_embeddings=model_params.n_positions,
+                hidden_size=model_params.n_embd,
+                num_hidden_layers=model_params.n_layer,
+                num_attention_heads=model_params.n_head,
+                num_labels = 1,
+            )
+            
+            data_collator = DataCollatorWithPadding(
+                tokenizer=tokenizer,
+                padding=True,
+            )
+            
+        elif arch == 'XLNet':
+            data_type = 'cat_txt'
+            base_model = XLNetLMHeadModel
+            config = XLNetConfig(
+                vocab_size=len(tokenizer.get_vocab()),
+                d_model=model_params.n_embd,
+                n_layer=model_params.n_layer,
+                n_head=model_params.n_head,
+                d_inner=model_params.d_inner,
+            )
+            
+            data_collator = DataCollatorForPermutationLanguageModeling(
+                tokenizer=tokenizer,
+                plm_probability=model_params.noise_density
+            )
+        
+        elif arch == 'T5':
+            data_type = 'cat_txt'
+            base_model = T5ForConditionalGeneration
+            config = T5Config(
+                vocab_size=len(tokenizer.get_vocab()),
+                d_model=model_params.n_embd,
+                d_kv=(model_params.n_embd // model_params.n_head) if model_params.n_head > 0 else 64,
+                d_ff=model_params.n_embd * 4,
+                num_layers=model_params.n_layer,
+                num_heads=model_params.n_head,
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+                decoder_start_token_id=tokenizer.bos_token_id,
+            )
+            
+            expanded_inputs_length, targets_length = compute_input_and_target_lengths(
+                inputs_length=data_params.max_len,
+                noise_density=model_params.noise_density,
+                mean_noise_span_length=model_params.mean_span,
+            )  
+            
+            data_collator = DataCollatorForT5MLM(
+                tokenizer=tokenizer,
+                noise_density=model_params.noise_density,
+                mean_noise_span_length=model_params.mean_span,
+                input_length=data_params.max_len,          
+                target_length=targets_length,
+                pad_token_id=tokenizer.pad_token_id,
+                decoder_start_token_id=tokenizer.bos_token_id,               
+            )
+            
+            data_params.max_len = expanded_inputs_length
+        
+        dataset = {
+            'train' : CifDataset(
+                data_params.train_data_path, 
+                tokenizer=tokenizer, 
+                data_type=data_type,
+                model_type=model_params.architecture,
+                string_type=data_params.string_type,
+                max_length=data_parmas.max_len,
+                add_props=data_params.add_props,
+            ),
+            
+            'val' : CifDataset(
+                data_params.val_data_path, 
+                tokenizer=tokenizer,
+                data_type=data_type,
+                model_type=model_params.architecture,
+                string_type=data_params.string_type,
+                max_length=data_parmas.max_len,
+                add_props=data_params.add_props,
+            ),
+        }
+    return data_type, base_model, config, dataset, data_collator

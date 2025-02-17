@@ -19,15 +19,15 @@ from tqdm import tqdm
 def parse_args():
     parser = argparse.ArgumentParser(description='generate structures from model checkpoint')
 
-    parser.add_argument('--cls_path', type=str, help='path to trained detection model checkpoint', required=True)
-    parser.add_argument('--gen_path', type=str, help='path to generated structures', required=True)
-    parser.add_argument('--save_path', type=str, help='path to validated data to save', required=True)
-    parser.add_argument('--gt_path', 
+    parser.add_argument('--cls-path', type=str, help='path to trained detection model checkpoint', required=True)
+    parser.add_argument('--gen-path', type=str, help='path to generated structures', required=True)
+    parser.add_argument('--save-path', type=str, help='path to validated data to save', required=True)
+    parser.add_argument('--gt-path', 
                         type=str, 
                         help='path to ground-truth structure data', 
                         default=f'{abs_path}/data/OC20-val-10K-crys.pkl', 
                         )    
-    parser.add_argument('--string_type', 
+    parser.add_argument('--string-type', 
                         type=str, 
                         help='tokenization type', 
                         default='coordinate', 
@@ -35,11 +35,11 @@ def parse_args():
     parser.add_argument('--device', type=str, help='device', default='cuda')
     
     # validation parameters
-    parser.add_argument('--n_samples', 
+    parser.add_argument('--n-samples', 
                         type=int,
                         help='the number of structures to validate', 
                         default=5000)
-    parser.add_argument('--skip_fail', 
+    parser.add_argument('--skip-fail', 
                         action=argparse.BooleanOptionalAction, 
                         help='skip overlapping atoms', 
                         default=False)
