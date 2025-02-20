@@ -53,7 +53,7 @@ python script/make_dataframe.py --name <DATASET_NAME> --src-path <DATASET_PATH> 
 - `num-workers` : Number of processes to use for data conversion.
   
 #### For training a detection model
-**Note:** Detection model-related options are currently unavailable.
+> **Note:** Detection model-related options are currently unavailable.
 
 ~~To train a detection model that evaluates catalyst validity, corrupted representations paired with binary labels (valid vs. corrupted) are needed.~~
 
