@@ -2,6 +2,9 @@ import sys, os
 abs_path = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
 sys.path.append(abs_path)
 
+os.environ["OMP_NUM_THREADS"] = '1'  
+os.environ["MKL_NUM_THREADS"] = '1'  
+
 import argparse
 import pandas as pd
 import numpy as np
@@ -32,11 +35,11 @@ def parse_args():
     parser.add_argument('--src-path', type=str, help='path to atomistic data to convert', required=True)
     parser.add_argument('--dst-path', type=str, help='path to string data to save', required=True)
     parser.add_argument('--data-type', type=str, help='lmdb or ase', default='lmdb', choices=['ase','lmdb'])
-    parser.add_argument('--corrupt-data', 
-                        action='store_true', 
-                        help='whether to add corrupted data for training detectino model', 
-                        default=False
-                        )  
+    #parser.add_argument('--corrupt-data', 
+    #                    action='store_true', 
+    #                    help='whether to add corrupted data for training detectino model', 
+    #                    default=False
+    #                    )  
     parser.add_argument('--num-workers',
                         type=int,
                         default=1,
@@ -47,6 +50,11 @@ def parse_args():
                         choices=['ads','spg','miller','energy','comp'],
                         help="list of properties to include dataframe, separated by spaces (e.g., --props spg mil energy)"
                         )
+    parser.add_argument('--chunk-size',
+                        type=int,
+                        default=1,
+                        help='size of chunk',
+                        )
     args = parser.parse_args()
     return args
 
@@ -56,12 +64,12 @@ g_get_energy = False
 g_dataset = None
 
 
-def init_worker(args, mapping, props, get_energy):
+def init_worker(src, mapping, props, get_energy):
     global g_mapping, g_props, g_get_energy, g_dataset
     g_mapping = mapping
     g_props = props
     g_get_energy = get_energy
-    g_dataset = LmdbDataset({'src': args.src_path})
+    g_dataset = LmdbDataset({'src': src})
 
 def corrupt_atoms(atoms):
 
@@ -170,28 +178,19 @@ def convert(args):
     
     to-do: add process to generate invalid catalyst data
     """
-
-    id_list = []
-    atoms_list = []
-    #ads_list = None
-    energy_list = []
-    prop_list = []
     
+    output_csv = os.path.join(args.dst_path, args.name + '.csv')
     local_props = None
     if args.props is not None:
         local_props = list(args.props)
         
     # convert lmdb to ase atoms
     if args.data_type == 'lmdb':
-        #ads_list = []
         
+        # initialize properties map
         mapping_path = os.path.join(abs_path, 'data/mapping/oc20_data_mapping_light.pkl')
         with open(mapping_path, 'rb') as fr:
             mapping = pickle.load(fr)
-                    
-        dataset_temp = LmdbDataset({'src':args.src_path})
-        n_items = len(dataset_temp)
-        del dataset_temp
         
         # process energy if present
         get_energy = False
@@ -200,69 +199,146 @@ def convert(args):
                 get_energy = True
                 local_props = [p for p in local_props if p != 'energy']
         
-        # set up MP
-        pool = mp.Pool(processes=args.num_workers,
-               initializer=init_worker,
-               initargs=(args, mapping, local_props, get_energy))
-               
-        # process items
-        results = list(tqdm(pool.imap(process_item, range(n_items)),
-                            total=n_items,
-                            desc="Converting"))
-                                
-        pool.close()
-        pool.join()        
         
-        for res in results:
-            id_, atoms_res, prop_it, energy_str = res
-            id_list.append(id_)
-            atoms_list.extend(atoms_res)  # Note: atoms_res is a list.
-            #ads_list.append(ads)
-            prop_list.append(prop_it)
+        if os.path.isdir(args.src_path):
+            src_path = [os.path.join(args.src_path + i) for i in os.listdir(args.src_path) if i.endswith('.lmdb')]
+        else:
+            src_path = [args.src_path]
+            
+        for idx, src_chunk in enumerate(src_path):
+            dataset_temp = LmdbDataset({'src':src_chunk})
+            n_items = len(dataset_temp)
+            del dataset_temp
+            
+            # set up MP
+            pool = mp.Pool(processes=args.num_workers,
+               initializer=init_worker,
+               initargs=(src_chunk, mapping, local_props, get_energy))
+
+               
+            # process items
+            results = list(tqdm(pool.imap(process_item, range(n_items)),
+                                total=n_items,
+                                desc=f'Converting lmdb chunk-{idx+1}'))
+                                
+            pool.close()
+            pool.join()        
+            
+            chunk_size = 5000000
+            n_chunks = n_items // chunk_size
+            
+            for chunk_idx in range(n_chunks):
+                start_idx = chunk_idx*chunk_size
+                end_idx = (chunk_idx+1)*chunk_size                
+                ids = []
+                atoms_list = []
+                props = []
+                energies = []
+
+                for res in results[start_idx:end_idx]:
+                    id_, atoms_res, prop_it, energy_str = res
+                    ids.append(id_)
+                    atoms_list.extend(atoms_res)
+                    props.append(prop_it)
+                    if get_energy:
+                        energies.append(energy_str)
+                
+                is_tagged = 2 in atoms_list[0].get_tags()
+                atoms_args = [(atoms, is_tagged) for atoms in atoms_list]
+                
+                with mp.Pool(processes=args.num_workers) as pool:
+                    cat_txt_list = list(tqdm(pool.imap(process_atoms_to_str, atoms_args),
+                                             total=len(atoms_args),
+                                             desc=f'Converting atoms chunk-{chunk_idx+1}'))
+                                             
+                df_chunk = pd.DataFrame({
+                    'id' : ids,
+                    'cat_txt': cat_txt_list
+                })
+                            
+                if local_props and len(props) > 0:
+                    props_transposed = [list(x) for x in zip(*props)]
+                    for prop_name, prop in zip(local_props, props_transposed):
+                        df_chunk[prop_name] = prop
+                        
+                if get_energy:
+                    df_chunk['energy'] = energies
+                
+                if (chunk_idx==0) & (idx==0):
+                    df_chunk.to_csv(output_csv, index=False, mode='w', header=True)
+                else:
+                    df_chunk.to_csv(output_csv, index=False, mode='a', header=False)
+                    
+                del ids, atoms_list, props, energies, cat_txt_list, atoms_args
+                
+            ids = []
+            atoms_list = []
+            props = []
+            energies = []
+            
+            for res in results[end_idx:]:
+                id_, atoms_res, prop_it, energy_str = res
+                ids.append(id_)
+                atoms_list.extend(atoms_res)
+                props.append(prop_it)
+                if get_energy:
+                    energies.append(energy_str)
+            
+            is_tagged = 2 in atoms_list[0].get_tags()
+            atoms_args = [(atoms, is_tagged) for atoms in atoms_list]
+            
+            with mp.Pool(processes=args.num_workers) as pool:
+                cat_txt_list = list(tqdm(pool.imap(process_atoms_to_str, atoms_args),
+                                         total=len(atoms_args),
+                                         desc=f'Converting last atoms chunk'))
+                                         
+            df_chunk = pd.DataFrame({
+                'id' : ids,
+                'cat_txt': cat_txt_list
+            })
+            
+            if local_props and len(props) > 0:
+                props_transposed = [list(x) for x in zip(*props)]
+                for prop_name, prop in zip(local_props, props_transposed):
+                    df_chunk[prop_name] = prop
+                    
             if get_energy:
-                energy_list.append(energy_str)                
+                df_chunk['energy'] = energies
+                
+            df_chunk.to_csv(output_csv, index=False, mode='a', header=False)
+       
             
     elif args.data_type == 'ase':
         if os.path.isdir(arg.src_path):
             atoms_list = [read(arg.src_path + i) for i in os.listdir(arg.src_path)]
         else:
             atoms_list = read(arg.src_path, ':')
-        id_list = list(range(len(atoms_list)))
-    
-    # convert atoms to string
-    is_tagged =  2 in atoms_list[0].get_tags()
-    atoms_args = [(atoms, is_tagged) for atoms in atoms_list]
-    
-    with mp.Pool(processes=args.num_workers) as pool:
-        cat_txt_list = list(tqdm(pool.imap(process_atoms_to_str, atoms_args),
-                                 total=len(atoms_args),
-                                 desc="Converting atoms to string"))
-    
-    df = pd.DataFrame(columns = ['id','cat_txt'])
-    df['id'] = id_list
-    df['cat_txt'] = cat_txt_list
-    
-    #if ads_list is not None:
-    #    df['ads_symbol'] = ads_list
-    
-    # add props
-    if local_props is not None and len(prop_list) > 0:
-        prop_list_transposed = [list(x) for x in zip(*prop_list)]
-        for idx, prop in enumerate(local_props):
-            df[prop] = prop_list_transposed[idx]
-    
-    if args.data_type == 'lmdb' and local_props is not None and get_energy:
-        df['energy'] = energy_list
+        ids = list(range(len(atoms_list)))
         
+        is_tagged = 2 in atoms_list[0].get_tags()
+        atoms_args = [(atoms, is_tagged) for atoms in atoms_list]
+            
+        with mp.Pool(processes=args.num_workers) as pool:
+            cat_txt_list = list(tqdm(pool.imap(process_atoms_to_str, atoms_args),
+                                     total=len(atoms_args),
+                                     desc=f'Converting atoms to string'))
+        
+        df = pd.DataFrame({
+            'id' : ids,
+            'cat_txt' : cat_txt_list
+        })
+        
+        df.to_csv(output_csv, index=False)
+    
+    """
+    # temporary removed    
     if args.corrupt_data:
         corrupted_cat_txt_list, corruption_label_list, corruption_type_list, parameter_list = corrupt_data(cat_txt_list)
         df['corrupted_cat_txt'] = corrupted_cat_txt_list
         df['corruption_label'] = corruption_label_list
         df['corruption_type'] =  corruption_type_list
         df['parameter'] = parameter_list
-    
-    output_csv = os.path.join(args.dst_path, args.name + '.csv')
-    df.to_csv(output_csv, index=True)
+    """
     print(f"Data saved to {output_csv}")
     
 if __name__ == '__main__':
