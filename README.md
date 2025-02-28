@@ -32,21 +32,35 @@ The training and validation dataset is sourced from the [Open Catalyst 2020 (OC2
 
 To convert the dataset to a dataframe with string representations for CatGPT training, run:
 ```
-python script/make_dataframe.py --name <DATASET_NAME> --src_path <DATASET_PATH> --dst_path <SAVE_PATH> --data_type lmdb
+python script/make_dataframe.py --name <DATASET_NAME> --src-path <DATASET_PATH> --dst-path <SAVE_PATH> --data-type lmdb
 ```
 #### Arguments
 - `name`: Name for the output dataframe.
-- `src_path`: Path to the source dataset.
-- `dst_path`: Path to save the converted dataframe.
-- `data_type` : Choose either `lmdb` (OC20 dataset format) or `ase` (atoms format that can be opened by ASE).
-
+- `src-path`: Path to the source dataset.
+- `dst-path`: Path to save the converted dataframe.
+- `data-type` : Choose either `lmdb` (OC20 dataset format) or `ase` (atoms format that can be opened by ASE).
+- `props` : List of properties to include in the dataframe. Multiple properties can be specified by separating them with spaces. Available options:
+    - `ads` : Types of adsorbate.
+    - `spg` : Space group symmetry of the bulk structure of catalyst.
+    - `miller` : Miller indices of surface.
+    - `comp` : Composition of the bulk structure of catalyst.
+      
+    **Example usage**
+    ```bash
+    --props ads spg miller comp    
+    ```
+    
+- `num-workers` : Number of processes to use for data conversion.
+  
 #### For training a detection model
-To train a detection model that evaluates catalyst validity, corrupted representations paired with binary labels (valid vs. corrupted) are needed. 
+> **Note:** Detection model-related options are currently unavailable.
 
-Users can generate corrupted data and labels into the dataframe by including the `--corrupt_data` argument:
+~~To train a detection model that evaluates catalyst validity, corrupted representations paired with binary labels (valid vs. corrupted) are needed.~~
+
+~~Users can generate corrupted data and labels into the dataframe by including the `--corrupt_data` argument:~~
 
 ```
-python script/make_dataframe.py --name <DATASET_NAME> --src_path <DATASET_PATH> --dst_path <SAVE_PATH> --data_type lmdb --corrupt_data
+python script/make_dataframe.py --name <DATASET_NAME> --src-path <DATASET_PATH> --dst-path <SAVE_PATH> --data-type lmdb --corrupt-data
 ```
 
 #### Fine-tuning Dataset
@@ -80,17 +94,17 @@ model_params:
 To generate string representations of catalyst structures, run:
 
 ```
-python script/generate.py --name <NAME> --ckpt_path <MODEL_PATH> --save_path <SAVE_PATH>
+python script/generate.py --name <NAME> --ckpt-path <MODEL_PATH> --save-path <SAVE_PATH>
 ```
 
 #### Required Arguments
 - `name`: Name for the generated structures set.
-- `ckpt_path`: Path to the trained generative model checkpoint.
-- `save_path`: Path to save the generated structures set.
+- `ckpt-path`: Path to the trained generative model checkpoint.
+- `save-path`: Path to save the generated structures set.
 
 #### Optional Arguments
-- `string_type` : Type of tokenization strategy to use.
-- `input_prompt` : Initial prompt for generation (e.g., a specific adsorbate).
+- `string-type` : Type of tokenization strategy to use.
+- `input-prompt` : Initial prompt for generation (e.g., a specific adsorbate).
 - `n_generation`, `top_k`, `top_p`, `temperature` : Generation parameters that control the diversity and creativity of generated structures.
 
 #### Pre-trained Model
@@ -101,33 +115,18 @@ You can download a pre-trained model checkpoint from [here](https://zenodo.org/r
 To evaluate generated strings and save them in a crystal format, run:
 
 ```
-python script/validate.py --cls_path <MODEL_PATH> --gen_path <GENERATED_DATA_PATH> --save_path <SAVE_PATH>
+python script/validate.py --cls-path <MODEL_PATH> --gen-path <GENERATED_DATA_PATH> --save-path <SAVE_PATH>
 ```
 #### Required Arguments
-- `cls_path`: Path to the trained detection model checkpoint.
-- `gen_path`: Path to the generated structures set.
-- `save_path`: Path to save validated data.
+- `cls-path`: Path to the trained detection model checkpoint.
+- `gen-path`: Path to the generated structures set.
+- `save-path`: Path to save validated data.
 
 #### Optional Arguments
-- `gt_path` : Path to ground-truth structure data for comparison.
-- `string_type` : Type of tokenization strategy to use.
-- `n_samples` : Number of structures to validate.
-- `skip_fail` : Option to bypass overlapping atoms in the generated structures.
+- `gt-path` : Path to ground-truth structure data for comparison.
+- `string-type` : Type of tokenization strategy to use.
+- `n-samples` : Number of structures to validate.
+- `skip-fail` : Option to bypass overlapping atoms in the generated structures.
 
 #### Pre-trained Model
 You can download a pre-trained detection model checkpoint from [here](https://zenodo.org/records/14504779)
-
-## Example Use
-
-### Adsorbate Conditional Generation
->⚠️ **Note**: Currently, the dataframe used for training the adsorbate conditional generative model *must* include a column for adsorbate symbols. The column will not be automatically added to the dataframe except only for the OC20 dataset.
-
-This feature generates catalyst structures conditioned on specified adsorbates.
-
-1. Set `string_type` as 'ads' in `config/config.yaml` to automatically add adsorbate symbols to the represenation.
-2. Run `python train.py` to train the model.
-3. Run `python script/generate.py --ckpt_path <TRAINED_MODEL_PATH> --input_prompt *O --string_type ads`
-
-Users can skip 1. and 2. by downloading the pretrained model checkpoint.
-
-The avaliable adsorbate symbols are the same as the list of adsorbates included in the [OC20 database](https://fair-chem.github.io/core/datasets/oc20.html#per-adsorbate-trajectories).
