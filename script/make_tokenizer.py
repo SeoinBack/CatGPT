@@ -114,7 +114,7 @@ def make_tokenizer(args):
             VOCAB += DIGITS + ENERGIES
     
     if token_type == 't5':
-        wrapped_tokenizer = T5TokenizerForCat(VOCAB, extra_ids=20)
+        wrapped_tokenizer = T5TokenizerForCat(VOCAB, extra_ids=100)
         wrapped_tokenizer.save_pretrained(data_path)
         print(f"{token_type}-{prop}tokenizer saved at: {data_path}")
         return None

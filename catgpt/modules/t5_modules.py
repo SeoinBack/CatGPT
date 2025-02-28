@@ -164,7 +164,8 @@ class DataCollatorForT5MLM:
         start_indices[:, 0] = mask_indices[:, 0]
 
         sentinel_ids = np.where(start_indices != 0, np.cumsum(start_indices, axis=-1), start_indices)
-        sentinel_ids = np.where(sentinel_ids != 0, (len(self.tokenizer) - sentinel_ids), 0)
+        sentinel_token_ids = sorted(self.tokenizer.get_sentinel_token_ids())
+        sentinel_ids = np.where(sentinel_ids != 0, (sentinel_token_ids[-1] - sentinel_ids), 0)
         sentinel_ids -= mask_indices - start_indices
 
         return sentinel_ids

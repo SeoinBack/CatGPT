@@ -109,7 +109,7 @@ class T5TokenizerForCat(PreTrainedTokenizer):
         )
 
     def get_sentinel_token_ids(self):
-        return [self.get_vocab[token] for token in self.get_sentinel_tokens()]
+        return [self.convert_tokens_to_ids(token) for token in self.get_sentinel_tokens()]
 
     def _add_eos_if_not_present(self, token_ids: List[int]) -> List[int]:
         """Do not add eos again if user already added it."""
@@ -167,7 +167,8 @@ class T5TokenizerForCat(PreTrainedTokenizer):
 
     def _convert_id_to_token(self, index):
         return self.tokenizer.id_to_token(index)
-
+        
+    """
     def convert_tokens_to_string(self, tokens):
         
         current_sub_tokens = []
@@ -187,7 +188,7 @@ class T5TokenizerForCat(PreTrainedTokenizer):
                 
         out_string += self.tokenizer.decode(current_sub_tokens)
         return out_string.strip()
-       
+    """
         
     def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None) -> Tuple[str]:
         if not os.path.isdir(save_directory):
