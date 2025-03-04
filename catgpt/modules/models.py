@@ -120,7 +120,7 @@ def get_model(model_params, data_params, tokenizer):
             data_type=data_type,
             model_type=model_params.architecture,
             string_type=data_params.string_type,
-            max_length=data_pars.max_len,
+            max_length=data_params.max_len,
             add_props=data_params.add_props,
         ),
     }

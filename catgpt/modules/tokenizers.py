@@ -17,7 +17,7 @@ class T5TokenizerForCat(PreTrainedTokenizer):
     def __init__(
         self,
         vocab: List,
-        extra_ids=20,
+        extra_ids=100,
         additional_special_tokens=None,
         add_prefix_space=True,
         max_len=1024,
