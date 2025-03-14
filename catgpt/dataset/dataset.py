@@ -3,9 +3,6 @@ import pandas as pd
 from torch.utils.data import Dataset
 from catgpt.dataset.dataset_utils import str_preprocess, prop_preprocess
 
-MAX_LENGTH =  1024
-
-
 class CifDataset(Dataset):
     '''
     Define custom dataset class for crystal structure generation
@@ -92,84 +89,12 @@ class CifDataset(Dataset):
                 labels=labels,
             )
         
-        elif self.model_type == 'T5':
+        elif self.model_type in ['T5','BART']:
             input_dict = dict(
                 input_ids=input_ids,
                 #attention_mask=attention_mask,
             )
         
-        return input_dict
-        
-    def __len__(self):
-        return len(self.inputs)
-
-    def __getitem__(self, index):
-        if not 0 <= index < len(self):
-            raise IndexError("Index out of range")
-        vals = self.inputs[index]
-        vals = self.tokenize(vals)
-        return vals
-        
-class T5Dataset(Dataset):
-    '''
-    Define custom dataset class for crystal structure generation
-    
-    todo: add compatibility check between string type and tokenizer
-    '''
-    
-    def __init__(
-        self,
-        csv_fn,
-        tokenizer=None,
-        data_type='cat_txt',
-        string_type='coordinate',
-        add_props=False,
-        augment_type=None,
-    ):
-        super().__init__()
-
-        df = pd.read_csv(csv_fn)
-        self.inputs = df.to_dict(orient='records')
-        self.tokenizer = tokenizer
-        self.data_type = data_type
-        self.string_type = string_type
-        self.augment_type = augment_type
-        self.add_props = add_props
-
-    def get_value_from_key(self, input_dict, key):
-        return input_dict[key]
-
-    def tokenize(self, input_dict):
-        input_str = self.get_value_from_key(input_dict, self.data_type)
-        
-        input_str = str_preprocess(
-                string_type=self.string_type, 
-                input_str=input_str, 
-                augment_type=self.augment_type,
-                )
-        
-        if self.add_props:
-            prop_str = prop_preprocess(
-                input_dict
-                )
-            input_str = ' '.join([prop_str,input_str])
-        
-        input_tokens = self.tokenizer(
-            ' '.join([self.tokenizer.bos_token, input_str, '.', self.tokenizer.eos_token]),
-            padding='max_length',
-            return_tensors='pt',
-            return_attention_mask=True,
-            max_length=MAX_LENGTH,
-            truncation=True,
-        )
-        
-        attention_mask = input_tokens.attention_mask[0]
-        input_ids = input_tokens.input_ids[0]
-        
-        input_dict = dict(
-            input_ids=input_ids,
-        )
-      
         return input_dict
         
     def __len__(self):

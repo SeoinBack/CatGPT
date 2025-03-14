@@ -1,11 +1,8 @@
 import os
 
-from transformers import GPT2Config, GPT2LMHeadModel, BertConfig, BertForSequenceClassification
 from transformers import PreTrainedTokenizerFast
-from transformers import DataCollatorForLanguageModeling
 from transformers import Trainer, TrainingArguments
 from peft import LoraConfig, get_peft_model
-
 
 from catgpt.modules.trainer import CustomHFTrainer
 from catgpt.modules.models import get_model
@@ -60,28 +57,6 @@ if model_params.use_pretrained:
     
 else:
     model =  base_model(config=config)
-    
-"""
-dataset = {
-    'train' : CifDataset(
-        data_params.train_data_path, 
-        tokenizer=tokenizer, 
-        data_type=data_type,
-        model_type=model_params.architecture,
-        string_type=data_params.string_type,
-        add_props=data_params.add_props,
-    ),
-    
-    'val' : CifDataset(
-        data_params.val_data_path, 
-        tokenizer=tokenizer,
-        data_type=data_type,
-        model_type=model_params.architecture,
-        string_type=data_params.string_type,
-        add_props=data_params.add_props,
-    ),
-}
-"""
 
 training_args = TrainingArguments(
     output_dir = f'./outputs/{model_params.name}/',

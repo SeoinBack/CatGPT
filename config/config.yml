@@ -12,7 +12,7 @@ model_params:
     n_epochs: 1
     d_inner: 1024
     
-    # for T5
+    # for PML
     noise_density: 0.15
     mean_span: 3
     

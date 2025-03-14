@@ -2,6 +2,7 @@ from transformers import (
     GPT2Config, GPT2LMHeadModel,
     BertConfig, BertForSequenceClassification,
     XLNetConfig, XLNetLMHeadModel,
+    BartConfig, BartForConditionalGeneration, 
     T5Config, T5ForConditionalGeneration,
     DataCollatorForLanguageModeling,
     DataCollatorForPermutationLanguageModeling,
@@ -9,6 +10,7 @@ from transformers import (
 )
 
 from catgpt.modules.t5_modules import DataCollatorForT5MLM, compute_input_and_target_lengths
+from catgpt.modules.bart_modules import DataCollatorForCatMLM
 from catgpt.dataset.dataset import CifDataset
 
 import torch
@@ -17,7 +19,7 @@ import numpy as np
 def get_model(model_params, data_params, tokenizer):
     
     arch = model_params.architecture
-    assert arch in ['GPT','BERT','XLNet','T5']
+    assert arch in ['GPT','BERT','XLNet','T5','BART']
     
     if arch in ['GPT','BERT','XLNet']:
         if arch == 'GPT':
@@ -69,7 +71,35 @@ def get_model(model_params, data_params, tokenizer):
                 tokenizer=tokenizer,
                 plm_probability=model_params.noise_density
             )
+    
+    elif arch == 'BART':
+        data_type = 'cat_txt'
+        base_model = BartForConditionalGeneration
         
+        config = BartConfig(
+            vocab_size=len(tokenizer.get_vocab()),
+            max_position_embeddings=model_params.n_positions,
+            encoder_layers=model_params.n_layer,
+            decoder_layers=model_params.n_layer,
+            d_model=model_params.n_embd,
+            encoder_ffn_dim=model_params.n_embd * 4,
+            decoder_ffn_dim=model_params.n_embd * 4,
+            encoder_attention_heads=model_params.n_head,
+            decoder_attention_heads=model_params.n_head,
+            bos_token_id=tokenizer.bos_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+            pad_token_id=tokenizer.pad_token_id,
+            decoder_start_token_id=tokenizer.bos_token_id,
+        )
+        
+        data_collator = DataCollatorForCatMLM(
+            tokenizer=tokenizer,
+            noise_density=model_params.noise_density,
+            mean_noise_span_length=model_params.mean_span,
+            decoder_start_token_id=tokenizer.bos_token_id,
+            max_length=data_params.max_len,
+        )
+         
     elif arch == 'T5':
         data_type = 'cat_txt'
         base_model = T5ForConditionalGeneration
