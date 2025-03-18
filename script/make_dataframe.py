@@ -226,8 +226,12 @@ def convert(args):
             
             chunk_size = 5000000
             n_chunks = n_items // chunk_size
+            if n_chunks == 0:
+                n_chunks_range = [0]
+            else:
+                n_chunks_range = range(n_chunks)
             
-            for chunk_idx in range(n_chunks):
+            for chunk_idx in n_chunks_range:
                 start_idx = chunk_idx*chunk_size
                 end_idx = (chunk_idx+1)*chunk_size                
                 ids = []
@@ -270,42 +274,43 @@ def convert(args):
                     df_chunk.to_csv(output_csv, index=False, mode='a', header=False)
                     
                 del ids, atoms_list, props, energies, cat_txt_list, atoms_args
-                
-            ids = []
-            atoms_list = []
-            props = []
-            energies = []
             
-            for res in results[end_idx:]:
-                id_, atoms_res, prop_it, energy_str = res
-                ids.append(id_)
-                atoms_list.extend(atoms_res)
-                props.append(prop_it)
+            if n_chunks != 0:    
+                ids = []
+                atoms_list = []
+                props = []
+                energies = []
+                
+                for res in results[end_idx:]:
+                    id_, atoms_res, prop_it, energy_str = res
+                    ids.append(id_)
+                    atoms_list.extend(atoms_res)
+                    props.append(prop_it)
+                    if get_energy:
+                        energies.append(energy_str)
+                
+                is_tagged = 2 in atoms_list[0].get_tags()
+                atoms_args = [(atoms, is_tagged) for atoms in atoms_list]
+                
+                with mp.Pool(processes=args.num_workers) as pool:
+                    cat_txt_list = list(tqdm(pool.imap(process_atoms_to_str, atoms_args),
+                                             total=len(atoms_args),
+                                             desc=f'Converting last atoms chunk'))
+                                             
+                df_chunk = pd.DataFrame({
+                    'id' : ids,
+                    'cat_txt': cat_txt_list
+                })
+                
+                if local_props and len(props) > 0:
+                    props_transposed = [list(x) for x in zip(*props)]
+                    for prop_name, prop in zip(local_props, props_transposed):
+                        df_chunk[prop_name] = prop
+                        
                 if get_energy:
-                    energies.append(energy_str)
-            
-            is_tagged = 2 in atoms_list[0].get_tags()
-            atoms_args = [(atoms, is_tagged) for atoms in atoms_list]
-            
-            with mp.Pool(processes=args.num_workers) as pool:
-                cat_txt_list = list(tqdm(pool.imap(process_atoms_to_str, atoms_args),
-                                         total=len(atoms_args),
-                                         desc=f'Converting last atoms chunk'))
-                                         
-            df_chunk = pd.DataFrame({
-                'id' : ids,
-                'cat_txt': cat_txt_list
-            })
-            
-            if local_props and len(props) > 0:
-                props_transposed = [list(x) for x in zip(*props)]
-                for prop_name, prop in zip(local_props, props_transposed):
-                    df_chunk[prop_name] = prop
+                    df_chunk['energy'] = energies
                     
-            if get_energy:
-                df_chunk['energy'] = energies
-                
-            df_chunk.to_csv(output_csv, index=False, mode='a', header=False)
+                df_chunk.to_csv(output_csv, index=False, mode='a', header=False)
        
             
     elif args.data_type == 'ase':
