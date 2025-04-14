@@ -64,15 +64,19 @@ training_args = TrainingArguments(
     do_train = True,
     do_eval = True,
     eval_strategy   = 'steps',
-    eval_steps = 5000,
+    eval_steps = data_params.eval_steps,
     per_device_train_batch_size = data_params.batch_size,
     per_device_eval_batch_size = data_params.batch_size,
     gradient_accumulation_steps = data_params.gradient_accumulation_steps,
     save_strategy = 'epoch',
     run_name = model_params.name,
     report_to = 'wandb',
-    num_train_epochs=15,
+    num_train_epochs=data_params.num_epochs,
     save_total_limit =5,
+    learning_rate=data_params.learning_rate,
+    warmup_steps=data_params.warmup_steps,
+    dataloader_num_workers=data_params.num_workers,
+    tf32 = data_params.tf32,
 )
 
 if model_params.use_numerical_encoding:

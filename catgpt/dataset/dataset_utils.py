@@ -70,15 +70,73 @@ def str_preprocess(string_type, input_str, augment_type=None, **kwargs):
     elif string_type == 'digit':
         return to_digit(input_str)
 
+def split_int_tokens(comp_str):
+    return re.sub(r'(\d+)', lambda m: ' '.join(m.group(0)), comp_str)
+
 def prop_preprocess(input_dict):
     props = ['ads','comp','spg','miller','energy']
     prop_str_list = []
     for prop in props:
         if prop in input_dict.keys():
-            prop_str_list.append(input_dict[prop])
+            if prop == 'comp':
+                prop_str_list.append(split_int_tokens(input_dict[prop]))
+            else:
+                prop_str_list.append(input_dict[prop])
             
     prop_str = ' '.join(prop_str_list)
     return prop_str
+    
+def hf_tokenization(
+        example,
+        tokenizer,
+        data_type='cat_txt',
+        model_type='GPT',
+        string_type='coordinate',
+        augment_type=None,
+        add_props=False,
+        max_length=1024,
+    ):
+    
+    input_str = example[data_type]
+    input_str = str_preprocess(
+        string_type=string_type,
+        input_str=input_str,
+        augment_type=augment_type    
+    )
+    
+    if add_props:
+        prop_str=prop_preprocess(example)
+        input_str= ' '.join([prop_str, input_str])
+    
+    input_tokens = tokenizer(
+        ' '.join([tokenizer.bos_token, input_str, '.', tokenizer.eos_token]),
+        padding='max_length',
+        return_tensors='pt',
+        max_length=max_length,
+        truncation=True,
+        return_attention_mask=True
+    )
+    
+    input_ids = input_tokens.input_ids[0].tolist()
+    attention_mask = input_tokens.attention_mask[0].tolist()
+    
+    if model_type in ['GPT', 'XLNet']:
+        labels = input_ids
+    elif model_type == 'BERT':
+        labels = example.get('corruption_label', None)
+    elif model_type in ['T5', 'BART']:
+        labels = None
+    else:
+        labels = None
+        
+    result = {
+        'input_ids': input_ids,
+        'attention_mask': attention_mask,
+    }
+    if labels is not None:
+        result['labels'] = labels
+
+    return result
 
 def count_ads_atoms(adsorbate_symbol: str) -> int:
     def parse_formula(formula: str) -> dict:

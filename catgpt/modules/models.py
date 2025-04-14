@@ -9,9 +9,12 @@ from transformers import (
     DataCollatorForSeq2Seq,
 )
 
+from catgpt.models.custom_models import GPT2LMHeadModelForConditionalGeneration
 from catgpt.modules.t5_modules import DataCollatorForT5MLM, compute_input_and_target_lengths
 from catgpt.modules.bart_modules import DataCollatorForCatMLM
 from catgpt.dataset.dataset import CifDataset
+from catgpt.dataset.dataset_utils import hf_tokenization
+from datasets import load_dataset
 
 import torch
 import numpy as np
@@ -21,10 +24,17 @@ def get_model(model_params, data_params, tokenizer):
     arch = model_params.architecture
     assert arch in ['GPT','BERT','XLNet','T5','BART']
     
+    if arch != 'GPT' and data_params.do_condition:
+        warnings.warn(
+            "Conditional generation is only available in GPT."
+        )
     if arch in ['GPT','BERT','XLNet']:
         if arch == 'GPT':
             data_type = 'cat_txt'
-            base_model = GPT2LMHeadModel
+            if data_params.do_condition:
+                base_model = GPT2LMHeadModelForConditionalGeneration
+            else:
+                base_model = GPT2LMHeadModel
             config = GPT2Config(
                 vocab_size=len(tokenizer.get_vocab()),
                 n_positions=model_params.n_positions,
@@ -38,7 +48,7 @@ def get_model(model_params, data_params, tokenizer):
                 mlm=False,
             )
     
-              
+                 
         elif arch == 'BERT':
             data_type = 'corrupted_cat_txt'
             base_model = BertForSequenceClassification
@@ -132,26 +142,58 @@ def get_model(model_params, data_params, tokenizer):
         )
         
         data_params.max_len = expanded_inputs_length
-    
-    dataset = {
-        'train' : CifDataset(
-            data_params.train_data_path, 
-            tokenizer=tokenizer, 
-            data_type=data_type,
-            model_type=model_params.architecture,
-            string_type=data_params.string_type,
-            max_length=data_params.max_len,
-            add_props=data_params.add_props,
-        ),
         
-        'val' : CifDataset(
-            data_params.val_data_path, 
-            tokenizer=tokenizer,
-            data_type=data_type,
-            model_type=model_params.architecture,
-            string_type=data_params.string_type,
-            max_length=data_params.max_len,
-            add_props=data_params.add_props,
-        ),
-    }
+    if data_params.use_hf_datasets:
+        raw_dataset = load_dataset(
+            'csv',
+            data_files={
+                'train':data_params.train_data_path,
+                'val':data_params.val_data_path,
+                }
+            )
+        
+        dataset = raw_dataset.map(
+            lambda ex: hf_tokenization(
+                ex,
+                tokenizer=tokenizer,
+                data_type=data_type,
+                model_type=model_params.architecture,
+                string_type=data_params.string_type,
+                augment_type=data_params.augment_type,
+                max_length=data_params.max_len,
+                add_props=data_params.add_props,
+            ),
+            batched=False,
+            num_proc=data_params.num_workers,
+        )
+        
+        keep_cols = ['input_ids', 'attention_mask', 'labels']
+        drop_cols = [
+            col for col in dataset['train'].column_names if col not in keep_cols
+        ]
+        
+        dataset = dataset.remove_columns(drop_cols)
+    
+    else:
+        dataset = {
+            'train' : CifDataset(
+                data_params.train_data_path, 
+                tokenizer=tokenizer, 
+                data_type=data_type,
+                model_type=model_params.architecture,
+                string_type=data_params.string_type,
+                max_length=data_params.max_len,
+                add_props=data_params.add_props,
+            ),
+            
+            'val' : CifDataset(
+                data_params.val_data_path, 
+                tokenizer=tokenizer,
+                data_type=data_type,
+                model_type=model_params.architecture,
+                string_type=data_params.string_type,
+                max_length=data_params.max_len,
+                add_props=data_params.add_props,
+            ),
+        }
     return base_model, config, dataset, data_collator
