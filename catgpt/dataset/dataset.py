@@ -1,5 +1,5 @@
 import pandas as pd
-
+import numbers
 from torch.utils.data import Dataset
 from catgpt.dataset.dataset_utils import str_preprocess, prop_preprocess
 
@@ -19,6 +19,8 @@ class CifDataset(Dataset):
         string_type='coordinate',
         max_length=1024,
         add_props=False,
+        do_condition=False,
+        condition_column=None,
         augment_type=None,
     ):
         super().__init__()
@@ -32,6 +34,8 @@ class CifDataset(Dataset):
         self.augment_type = augment_type
         self.max_length = max_length
         self.add_props = add_props
+        self.do_condition = do_condition
+        self.condition_column = condition_column
 
     def get_value_from_key(self, input_dict, key):
         return input_dict[key]
@@ -39,23 +43,42 @@ class CifDataset(Dataset):
     def tokenize(self, input_dict):
         input_str = self.get_value_from_key(input_dict, self.data_type)
         
-        #if self.string_type == 'ads':
-        #    ads = self.get_value_from_key(input_dict, 'ads_symbol')
-        #else:
-        #    ads = None
+        if '<sep>' in input_str:
+            add_sep = True
+        else:
+            add_sep = False
         
         input_str = str_preprocess(
                 string_type=self.string_type, 
                 input_str=input_str, 
                 augment_type=self.augment_type,
-        #        ads=ads
                 )
         
         if self.add_props:
             prop_str = prop_preprocess(
-                input_dict
+                input_dict,
+                add_sep = add_sep
                 )
-            input_str = ' '.join([prop_str,input_str])
+            if add_sep:
+                input_str = ' <sep> '.join([prop_str,input_str])        
+            else:
+                input_str = ' '.join([prop_str,input_str])
+        
+        if self.do_condition:
+            if self.condition_column is None:
+                condition_value = None
+                
+            elif self.condition_column not in input_dict.keys():
+                raise KeyError(f"Condition column '{self.condition_column}' does not exist in dataset.")
+            
+            else:
+                condition_value = self.get_value_from_key(input_dict, self.condition_column)
+                if not isinstance(condition_value, numbers.Number):
+                    raise TypeError("The condition column values must be numeric.")
+
+        else:
+            condition_value = None
+        
         
         # tokenize crystal strings with bos and eos token
         input_tokens = self.tokenizer(
@@ -71,31 +94,30 @@ class CifDataset(Dataset):
         attention_mask = input_tokens.attention_mask[0]
         input_ids = input_tokens.input_ids[0]
         
-        if self.model_type in ['GPT','XLNet']:
+        if self.model_type in ['GPT', 'XLNet']:
             labels = input_ids
-            
-            input_dict = dict(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                labels=labels,
-            )
             
         elif self.model_type == 'BERT':
             labels = self.get_value_from_key(input_dict, 'corruption_label')
             
-            input_dict = dict(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                labels=labels,
-            )
+        elif self.model_type in ['T5', 'BART']:
+            labels = None
+            
+        else:
+            labels = None
+            
+        result = {
+            'input_ids': input_ids,
+            'attention_mask': attention_mask,
+        }
         
-        elif self.model_type in ['T5','BART']:
-            input_dict = dict(
-                input_ids=input_ids,
-                #attention_mask=attention_mask,
-            )
+        if labels is not None:
+            result['labels'] = labels
+            
+        if condition_value is not None:
+            result['condition_values'] = [float(condition_value)]
         
-        return input_dict
+        return result
         
     def __len__(self):
         return len(self.inputs)

@@ -35,6 +35,12 @@ def parse_args():
     parser.add_argument('--src-path', type=str, help='path to atomistic data to convert', required=True)
     parser.add_argument('--dst-path', type=str, help='path to string data to save', required=True)
     parser.add_argument('--data-type', type=str, help='lmdb or ase', default='lmdb', choices=['ase','lmdb'])
+    parser.add_argument('--add-sep', action='store_true', help='whether to add seperation tokens', default=False)
+    parser.add_argument('--use-relaxed',
+                        action='store_ture', 
+                        help='whether to use relaxed sturctures when IS2RE',
+                        default=False
+                        ) 
     #parser.add_argument('--corrupt-data', 
     #                    action='store_true', 
     #                    help='whether to add corrupted data for training detectino model', 
@@ -52,7 +58,7 @@ def parse_args():
                         )
     parser.add_argument('--chunk-size',
                         type=int,
-                        default=1,
+                        default=1000000,
                         help='size of chunk',
                         )
     args = parser.parse_args()
@@ -61,14 +67,16 @@ def parse_args():
 g_mapping = None
 g_props = None
 g_get_energy = False
+g_use_realxed = False
 g_dataset = None
 
 
-def init_worker(src, mapping, props, get_energy):
+def init_worker(src, mapping, props, get_energy, use_relaxed):
     global g_mapping, g_props, g_get_energy, g_dataset
     g_mapping = mapping
     g_props = props
     g_get_energy = get_energy
+    g_use_relaxed = use_relaxed
     g_dataset = LmdbDataset({'src': src})
 
 def corrupt_atoms(atoms):
@@ -125,16 +133,10 @@ def corrupt_data(cat_txt_list):
     return corrupted_cat_txt_list, corruption_label_list, corruption_type_list, parameter_list
 
 def process_item(i):
-    global g_mapping, g_props, g_get_energy, g_dataset
+    global g_mapping, g_props, g_get_energy, g_dataset, g_use_relaxed
     data = g_dataset[i]
     id_ = data.sid
     key = 'random' + str(id_)
-    
-    #if key in g_mapping:
-    #    ads = g_mapping[key]['ads']
-    #else:
-    #    ads = None
-    #    print(f"Warning: Key '{key}' not found in mapping.")
     
     prop_it = []
     if g_props is not None:
@@ -149,7 +151,8 @@ def process_item(i):
             if hasattr(batch, att):
                 energy_att = att
                 break
-                
+        batch.energy = getattr(batch,energy_att)        
+        
     energy_str = None
     if g_get_energy:
         if not hasattr(batch, energy_att):
@@ -161,6 +164,10 @@ def process_item(i):
     if not hasattr(batch, 'force') and hasattr(batch, 'forces'):
         batch.force = batch.forces
     
+    # use relaxed position if possible
+    if hasattr(batch, 'pos_relaxed') and g_use_relaxed:
+        batch.pos = batch.pos_relaxed
+    
     atoms = batch_to_atoms(batch)
     
     if hasattr(data, 'fid'):
@@ -169,8 +176,8 @@ def process_item(i):
     return (id_, atoms, prop_it, energy_str)
 
 def process_atoms_to_str(args):
-    atoms, tagged = args
-    return atoms_to_str(atoms, tagged=tagged)
+    atoms, tagged, add_sep = args
+    return atoms_to_str(atoms, tagged=tagged, add_sep=add_sep)
     
 def convert(args):
     """
@@ -213,7 +220,7 @@ def convert(args):
             # set up MP
             pool = mp.Pool(processes=args.num_workers,
                initializer=init_worker,
-               initargs=(src_chunk, mapping, local_props, get_energy))
+               initargs=(src_chunk, mapping, local_props, get_energy, args.use_relaxed))
 
                
             # process items
@@ -224,7 +231,7 @@ def convert(args):
             pool.close()
             pool.join()        
             
-            chunk_size = 5000000
+            chunk_size = args.chunk_size
             n_chunks = n_items // chunk_size
             if n_chunks == 0:
                 n_chunks_range = [0]
@@ -248,7 +255,8 @@ def convert(args):
                         energies.append(energy_str)
                 
                 is_tagged = 2 in atoms_list[0].get_tags()
-                atoms_args = [(atoms, is_tagged) for atoms in atoms_list]
+                
+                atoms_args = [(atoms, is_tagged, args.add_sep) for atoms in atoms_list]
                 
                 with mp.Pool(processes=args.num_workers) as pool:
                     cat_txt_list = list(tqdm(pool.imap(process_atoms_to_str, atoms_args),
@@ -290,7 +298,7 @@ def convert(args):
                         energies.append(energy_str)
                 
                 is_tagged = 2 in atoms_list[0].get_tags()
-                atoms_args = [(atoms, is_tagged) for atoms in atoms_list]
+                atoms_args = [(atoms, is_tagged, args.add_sep) for atoms in atoms_list]
                 
                 with mp.Pool(processes=args.num_workers) as pool:
                     cat_txt_list = list(tqdm(pool.imap(process_atoms_to_str, atoms_args),
@@ -321,7 +329,7 @@ def convert(args):
         ids = list(range(len(atoms_list)))
         
         is_tagged = 2 in atoms_list[0].get_tags()
-        atoms_args = [(atoms, is_tagged) for atoms in atoms_list]
+        atoms_args = [(atoms, is_tagged, args.add_sep) for atoms in atoms_list]
             
         with mp.Pool(processes=args.num_workers) as pool:
             cat_txt_list = list(tqdm(pool.imap(process_atoms_to_str, atoms_args),

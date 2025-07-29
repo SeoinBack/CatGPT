@@ -1,5 +1,7 @@
 import pickle
 import random
+import numbers
+import re
 from math import gcd
 from functools import partial, reduce
 
@@ -73,8 +75,8 @@ def str_preprocess(string_type, input_str, augment_type=None, **kwargs):
 def split_int_tokens(comp_str):
     return re.sub(r'(\d+)', lambda m: ' '.join(m.group(0)), comp_str)
 
-def prop_preprocess(input_dict):
-    props = ['ads','comp','spg','miller','energy']
+def prop_preprocess(input_dict, add_sep = False):
+    props = ['ads','comp','spg','miller']
     prop_str_list = []
     for prop in props:
         if prop in input_dict.keys():
@@ -82,61 +84,12 @@ def prop_preprocess(input_dict):
                 prop_str_list.append(split_int_tokens(input_dict[prop]))
             else:
                 prop_str_list.append(input_dict[prop])
-            
-    prop_str = ' '.join(prop_str_list)
-    return prop_str
-    
-def hf_tokenization(
-        example,
-        tokenizer,
-        data_type='cat_txt',
-        model_type='GPT',
-        string_type='coordinate',
-        augment_type=None,
-        add_props=False,
-        max_length=1024,
-    ):
-    
-    input_str = example[data_type]
-    input_str = str_preprocess(
-        string_type=string_type,
-        input_str=input_str,
-        augment_type=augment_type    
-    )
-    
-    if add_props:
-        prop_str=prop_preprocess(example)
-        input_str= ' '.join([prop_str, input_str])
-    
-    input_tokens = tokenizer(
-        ' '.join([tokenizer.bos_token, input_str, '.', tokenizer.eos_token]),
-        padding='max_length',
-        return_tensors='pt',
-        max_length=max_length,
-        truncation=True,
-        return_attention_mask=True
-    )
-    
-    input_ids = input_tokens.input_ids[0].tolist()
-    attention_mask = input_tokens.attention_mask[0].tolist()
-    
-    if model_type in ['GPT', 'XLNet']:
-        labels = input_ids
-    elif model_type == 'BERT':
-        labels = example.get('corruption_label', None)
-    elif model_type in ['T5', 'BART']:
-        labels = None
+    if add_sep:
+        prop_str = ' <sep> '.join(prop_str_list)
     else:
-        labels = None
-        
-    result = {
-        'input_ids': input_ids,
-        'attention_mask': attention_mask,
-    }
-    if labels is not None:
-        result['labels'] = labels
+        prop_str = ' '.join(prop_str_list)
+    return prop_str
 
-    return result
 
 def count_ads_atoms(adsorbate_symbol: str) -> int:
     def parse_formula(formula: str) -> dict:
@@ -174,7 +127,90 @@ def count_ads_atoms(adsorbate_symbol: str) -> int:
     
     return total_atoms
     
+def hf_tokenization(
+        example,
+        tokenizer,
+        data_type='cat_txt',
+        model_type='GPT',
+        string_type='coordinate',
+        augment_type=None,
+        add_props=False,
+        do_condition=False,
+        condition_column=None,
+        max_length=1024,
+    ):
     
+    input_str = example[data_type]
+    
+    if '<sep>' in input_str:
+        add_sep = True
+    else:
+        add_sep = False
+    
+    input_str = str_preprocess(
+        string_type=string_type,
+        input_str=input_str,
+        augment_type=augment_type    
+    )
+    
+    if add_props:
+        prop_str=prop_preprocess(
+            example, 
+            add_sep,
+            )
+        if add_sep:
+            input_str = ' <sep> '.join([prop_str,input_str])        
+        else:
+            input_str = ' '.join([prop_str,input_str])
+                    
+    if do_condition:
+        if condition_column is None:
+            condition_value = None
+        
+        elif condition_column not in example:
+            raise KeyError(f"Condition column '{condition_column}' does not exist in dataset.")
+        
+        else:
+            condition_value = example[condition_column]
+            if not isinstance(condition_value, numbers.Number):
+                raise TypeError("The condition column values must be numeric.")
+    else:
+        condition_value = None
+    
+    input_tokens = tokenizer(
+        ' '.join([tokenizer.bos_token, input_str, '.', tokenizer.eos_token]),
+        padding='max_length',
+        return_tensors='pt',
+        max_length=max_length,
+        truncation=True,
+        return_attention_mask=True
+    )
+    
+    input_ids = input_tokens.input_ids[0].tolist()
+    attention_mask = input_tokens.attention_mask[0].tolist()
+    
+    if model_type in ['GPT', 'XLNet']:
+        labels = input_ids
+    elif model_type == 'BERT':
+        labels = example.get('corruption_label', None)
+    elif model_type in ['T5', 'BART']:
+        labels = None
+    else:
+        labels = None
+        
+    result = {
+        'input_ids': input_ids,
+        'attention_mask': attention_mask,
+    }
+    if labels is not None:
+        result['labels'] = labels
+        
+    if condition_value is not None:
+        result['condition_values'] = [float(condition_value)]
+
+    return result
+    
+        
 def simplify_formula(s):
     tokens = s.split()
     numbers = []

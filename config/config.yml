@@ -9,6 +9,7 @@ model_params:
     n_embd: 512
     n_layer: 12
     n_head: 8
+    n_epochs: 1
     d_inner: 1024
     
     # for PML
@@ -28,20 +29,22 @@ data_params:
     string_type: 'coordinate'
     augment_type: 'normal'
     add_props: False
+    do_condition: False
+    condition_column: 'energy'
     
     train_data_path: './data/dataset/oc20-2M/train.csv'
     val_data_path: './data/dataset/oc20-2M/val.csv'
     
     # hyperparameters
-    num_epochs: 15
+    num_epochs: 20
     max_len: 1024
-    batch_size: 96
-    gradient_accumulation_steps: 1
+    batch_size: 32
+    gradient_accumulation_steps: 3
     learning_rate: 1e-3
     warmup_steps: 1000
     
     # etc
     eval_steps: 5000,
-    tf32: True
+    tf32: False
     num_workers: 4
-    use_hf_datasets: True
+    use_hf_datasets: False

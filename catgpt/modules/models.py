@@ -18,6 +18,7 @@ from datasets import load_dataset
 
 import torch
 import numpy as np
+import warnings
 
 def get_model(model_params, data_params, tokenizer):
     
@@ -48,7 +49,7 @@ def get_model(model_params, data_params, tokenizer):
                 mlm=False,
             )
     
-                 
+              
         elif arch == 'BERT':
             data_type = 'corrupted_cat_txt'
             base_model = BertForSequenceClassification
@@ -142,7 +143,7 @@ def get_model(model_params, data_params, tokenizer):
         )
         
         data_params.max_len = expanded_inputs_length
-        
+    
     if data_params.use_hf_datasets:
         raw_dataset = load_dataset(
             'csv',
@@ -162,12 +163,14 @@ def get_model(model_params, data_params, tokenizer):
                 augment_type=data_params.augment_type,
                 max_length=data_params.max_len,
                 add_props=data_params.add_props,
+                do_condition=data_params.do_condition,
+                condition_column=data_params.condition_column
             ),
             batched=False,
             num_proc=data_params.num_workers,
         )
         
-        keep_cols = ['input_ids', 'attention_mask', 'labels']
+        keep_cols = ['input_ids', 'condition_values', 'attention_mask', 'labels']
         drop_cols = [
             col for col in dataset['train'].column_names if col not in keep_cols
         ]
@@ -184,6 +187,8 @@ def get_model(model_params, data_params, tokenizer):
                 string_type=data_params.string_type,
                 max_length=data_params.max_len,
                 add_props=data_params.add_props,
+                do_condition=data_params.do_condition,
+                condition_column=data_params.condition_column
             ),
             
             'val' : CifDataset(
@@ -194,6 +199,8 @@ def get_model(model_params, data_params, tokenizer):
                 string_type=data_params.string_type,
                 max_length=data_params.max_len,
                 add_props=data_params.add_props,
+                do_condition=data_params.do_condition,
+                condition_column=data_params.condition_column
             ),
         }
     return base_model, config, dataset, data_collator
