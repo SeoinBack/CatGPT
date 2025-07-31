@@ -16,7 +16,7 @@ import shutil
 import wandb
 os.environ['WANDB_PROJECT'] ='CatGPT'
 
-params = OmegaConf.load('./config/config_mine.yml')
+params = OmegaConf.load('./config/config.yml')
 model_params = params.model_params
 data_params = params.data_params
 

@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument('--data-type', type=str, help='lmdb or ase', default='lmdb', choices=['ase','lmdb'])
     parser.add_argument('--add-sep', action='store_true', help='whether to add seperation tokens', default=False)
     parser.add_argument('--use-relaxed',
-                        action='store_ture', 
+                        action='store_true', 
                         help='whether to use relaxed sturctures when IS2RE',
                         default=False
                         ) 

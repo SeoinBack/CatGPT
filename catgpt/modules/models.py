@@ -9,7 +9,7 @@ from transformers import (
     DataCollatorForSeq2Seq,
 )
 
-from catgpt.models.custom_models import GPT2LMHeadModelForConditionalGeneration
+from catgpt.models.conditional_gpt import GPT2LMHeadModelForConditionalGeneration
 from catgpt.modules.t5_modules import DataCollatorForT5MLM, compute_input_and_target_lengths
 from catgpt.modules.bart_modules import DataCollatorForCatMLM
 from catgpt.dataset.dataset import CifDataset
