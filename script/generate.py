@@ -23,11 +23,9 @@ def parse_args():
     parser.add_argument('--name', type=str, help='name of generated structures', required=True)
     parser.add_argument('--ckpt-path', type=str, help='path to trained generative model checkpoint', required=True)
     parser.add_argument('--save-path', type=str, help='path to generated data to save', required=True)
-    parser.add_argument('--string-type', 
-                        type=str, 
-                        help='tokenization type', 
-                        default='coordinate', 
-                        choices=['coordinate','digit','split','ads'])
+    parser.add_argument('--tokenizer-path', 
+                        type=str,
+                        help='path to tokenizer')
     parser.add_argument('--add-props',
                         action='store_true',
                         default=False)
@@ -64,15 +62,12 @@ def parse_args():
 def generate(args):
     device = torch.device(args.device)
     
-    if args.add_props:
-        props = 'prop-'
+    if args.tokenizer_path == None:
+      tokenizer_src = args.ckpt_path
     else:
-        props = ''
-    
-    tokenizer = PreTrainedTokenizerFast.from_pretrained(
-        f'{abs_path}/data/tokenizer/{args.string_type}-{props}tokenizer/',
-        max_len=1024
-    )
+      tokenizer_src = args.tokenizer_path
+      
+    tokenizer = PreTrainedTokenizerFast.from_pretrained(tokenizer_src)
     model = GPT2LMHeadModel.from_pretrained(args.ckpt_path).to(device)
     
     generated = []
@@ -93,10 +88,19 @@ def generate(args):
                     num_return_sequences=1,
                     pad_token_id=1,
                 )
-                atoms_str = tokenizer.decode(output_sequences[0]).split('. <eos>')[0]
-    
+                decoded_output = tokenizer.decode(output_sequences[0]).split('. <eos>')[0]
                 try:
-                    atoms, struct_val, gen_val  = str_to_atoms(atoms_str,lat_idx=1, skip_fail=False, early_stop=False)
+                    if args.add_props: 
+                        atoms_str = ' '.join(''.join(decoded_output.split(' <sep>')[-4:]).split(' ')[1:-1])
+                        lat_idx = 0
+                    else:
+                        atoms_str = decoded_output
+                        lat_idx = 1
+                except IndexError:
+                    continue
+                                      
+                try:
+                    atoms, struct_val, gen_val  = str_to_atoms(atoms_str,lat_idx=lat_idx, skip_fail=False, early_stop=False)
                 except np.linalg.LinAlgError:
                     continue
                 pbar.update()

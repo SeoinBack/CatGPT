@@ -63,7 +63,7 @@ def make_tokenizer(args):
                    '*CHOH', '*CHOHCHOH', '*COHCHOH', '*CHCH2', '*CHOCH2OH', '*CCHO', '*N', '*N*NO', '*OH', '*COCH2O', 
                    '*COCH3', '*CCH3', '*OHCH3', '*CH2', '*CH3', '*CH2*O', '*OCH2CH3', '*CH2OH', '*CCHOH', '*OCH3', 
                    '*CHO*CHO', '*CHOHCH2OH', '*CHCHOH', '*OCH2CHOH', '*OH2', '*OHNNCH3', '*N2', '*COHCH2OH', '*COCHO', 
-                   '*NO2', '*O', '*CHCO', '*COHCHO', '*CHOHCH2', '*ONH', '*NONH', '*NO'
+                   '*NO2', '*O', '*CHCO', '*COHCHO', '*CHOHCH2', '*ONH', '*NONH', '*NO',
                    # OC22
                    '*CO', '*H2O', '*O2', '*HO2', 'none']
     

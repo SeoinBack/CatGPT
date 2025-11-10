@@ -67,7 +67,7 @@ def parse_args():
 g_mapping = None
 g_props = None
 g_get_energy = False
-g_use_realxed = False
+g_use_relaxed = False
 g_dataset = None
 
 
