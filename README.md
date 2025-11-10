@@ -108,7 +108,8 @@ python script/generate.py --name <NAME> --ckpt-path <MODEL_PATH> --save-path <SA
 - `n_generation`, `top_k`, `top_p`, `temperature` : Generation parameters that control the diversity and creativity of generated structures.
 
 #### Pre-trained Model
-You can download a pre-trained model checkpoint from [here](https://zenodo.org/records/14406696)
+The pretrained checkpoint is temporarily unavailable for download.
+It can be provided upon request.
 
 ## Evaluation
 
